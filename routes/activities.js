@@ -19,7 +19,7 @@ router.get('/', async (req, res) => {
 
     const activities = await Activity.find(filter)
       .populate('clientId', 'name email company')
-      .populate('assignedTo', 'name email role')
+      .populate('assignedTo', 'name email role photo')
       .populate('createdBy', 'name email')
       .sort({ createdAt: -1 });
     
@@ -34,7 +34,7 @@ router.get('/assigned/:userId', async (req, res) => {
   try {
     const activities = await Activity.find({ assignedTo: req.params.userId })
       .populate('clientId', 'name email company')
-      .populate('assignedTo', 'name email role')
+      .populate('assignedTo', 'name email role photo')
       .populate('createdBy', 'name email')
       .sort({ dueDate: 1 });
     
@@ -59,7 +59,7 @@ router.post('/', async (req, res) => {
     // Poblar la actividad creada antes de enviarla
     const populatedActivity = await Activity.findById(activity._id)
       .populate('clientId', 'name email company')
-      .populate('assignedTo', 'name email role')
+      .populate('assignedTo', 'name email role photo')
       .populate('createdBy', 'name email');
     
     console.log('📋 Populated activity:', populatedActivity);
@@ -80,7 +80,7 @@ router.put('/:id', async (req, res) => {
       { new: true }
     )
       .populate('clientId', 'name email company')
-      .populate('assignedTo', 'name email role')
+      .populate('assignedTo', 'name email role photo')
       .populate('createdBy', 'name email');
     
     if (!activity) {
@@ -103,7 +103,7 @@ router.patch('/:id/status', async (req, res) => {
       { new: true }
     )
       .populate('clientId', 'name email company')
-      .populate('assignedTo', 'name email role')
+      .populate('assignedTo', 'name email role photo')
       .populate('createdBy', 'name email');
     
     if (!activity) {
@@ -135,7 +135,7 @@ router.patch('/:id/assign', async (req, res) => {
       { new: true }
     )
       .populate('clientId', 'name email company')
-      .populate('assignedTo', 'name email role')
+      .populate('assignedTo', 'name email role photo')
       .populate('createdBy', 'name email');
     
     if (!activity) {

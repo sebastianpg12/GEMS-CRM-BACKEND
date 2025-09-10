@@ -92,7 +92,7 @@ Esta colección de Postman contiene todos los endpoints disponibles en el backen
               "raw": "{\n  \"name\": \"Juan Pérez Actualizado\",\n  \"email\": \"juan.perez.actualizado@email.com\",\n  \"phone\": \"+57 300 987 6543\",\n  \"company\": \"Nueva Empresa XYZ\"\n}"
             },
             "url": {
-              "raw": "{{baseUrl}}/clients/{{clientId}}",
+              "raw": "{{baseUrl}}/clientsss/{{clientId}}",
               "host": ["{{baseUrl}}"],
               "path": ["clients", "{{clientId}}"]
             }

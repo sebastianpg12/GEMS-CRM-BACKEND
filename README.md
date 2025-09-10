@@ -11,8 +11,8 @@ Backend completo para el sistema CRM de GEMS Innovations, construido con Node.js
 - **Autenticación**: JWT (JSON Web Tokens)
 - **Upload de Archivos**: Multer
 - **Validación**: Mongoose Schema Validation
-- **CORS**: Configuración completa para frontend
-
+- **CORS**: Configuración completa para frontend update
+---
 ### Estructura del Proyecto
 ```
 back-crm-gems/

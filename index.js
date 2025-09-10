@@ -2,14 +2,35 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const path = require('path');
+const http = require('http');
+const socketIo = require('socket.io');
 require('dotenv').config();
+
 const app = express();
+const server = http.createServer(app);
+const io = socketIo(server, {
+  cors: {
+    origin: ["http://localhost:3000", "http://localhost:5173", "http://localhost:8080"],
+    methods: ["GET", "POST"],
+    credentials: true
+  }
+});
 
 app.use(cors());
 app.use(express.json());
 
 // Servir archivos estáticos de uploads
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
+// Create uploads/chat directory if it doesn't exist
+const fs = require('fs');
+const chatUploadsDir = path.join(__dirname, 'uploads', 'chat');
+if (!fs.existsSync(chatUploadsDir)) {
+  fs.mkdirSync(chatUploadsDir, { recursive: true });
+}
+
+// Store io instance in app for use in routes
+app.set('io', io);
 
 // Importar rutas
 const authRoutes = require('./routes/auth');
@@ -26,6 +47,7 @@ const minutesRoutes = require('./routes/minutes');
 const settingsRoutes = require('./routes/settings');
 const teamRoutes = require('./routes/team');
 const reportsRoutes = require('./routes/reports');
+const chatRoutes = require('./routes/chat');
 
 // Usar rutas
 app.use('/api/auth', authRoutes);
@@ -42,6 +64,7 @@ app.use('/api/minutes', minutesRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/team', teamRoutes);
 app.use('/api/reports', reportsRoutes);
+app.use('/api/chat', chatRoutes);
 
 // Conexión a MongoDB usando .env
 mongoose.connect(process.env.MONGO_URI, {
@@ -55,7 +78,50 @@ db.once('open', () => {
   console.log('Connected to MongoDB');
 });
 
+// Socket.io connection handling
+io.on('connection', (socket) => {
+  console.log('User connected:', socket.id);
+  
+  // Join user to their personal room
+  socket.on('join_user_room', (userId) => {
+    socket.join(`user_${userId}`);
+    console.log(`User ${userId} joined their room`);
+  });
+  
+  // Join chat room
+  socket.on('join_room', (roomId) => {
+    socket.join(`room_${roomId}`);
+    console.log(`User joined room: ${roomId}`);
+  });
+  
+  // Leave chat room
+  socket.on('leave_room', (roomId) => {
+    socket.leave(`room_${roomId}`);
+    console.log(`User left room: ${roomId}`);
+  });
+  
+  // Handle typing indicators
+  socket.on('typing_start', (data) => {
+    socket.to(`room_${data.roomId}`).emit('user_typing', {
+      userId: data.userId,
+      userName: data.userName,
+      roomId: data.roomId
+    });
+  });
+  
+  socket.on('typing_stop', (data) => {
+    socket.to(`room_${data.roomId}`).emit('user_stop_typing', {
+      userId: data.userId,
+      roomId: data.roomId
+    });
+  });
+  
+  socket.on('disconnect', () => {
+    console.log('User disconnected:', socket.id);
+  });
+});
+
 const PORT = process.env.PORT || 4000;
-app.listen(PORT, () => {
+server.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 });

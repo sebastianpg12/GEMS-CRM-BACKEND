@@ -1,9 +1,48 @@
 const express = require('express');
 const bcrypt = require('bcryptjs');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
 const User = require('../models/User');
 const { generateToken, authenticateToken } = require('../middleware/auth');
 
 const router = express.Router();
+
+// Configuración de multer para subir fotos
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    const uploadPath = path.join(__dirname, '../uploads/profiles');
+    
+    // Crear directorio si no existe
+    if (!fs.existsSync(uploadPath)) {
+      fs.mkdirSync(uploadPath, { recursive: true });
+    }
+    
+    cb(null, uploadPath);
+  },
+  filename: function (req, file, cb) {
+    // Generar nombre único con timestamp y ID de usuario
+    const uniqueName = `profile-${req.user.id}-${Date.now()}${path.extname(file.originalname)}`;
+    cb(null, uniqueName);
+  }
+});
+
+const fileFilter = (req, file, cb) => {
+  // Permitir solo imágenes
+  if (file.mimetype.startsWith('image/')) {
+    cb(null, true);
+  } else {
+    cb(new Error('Solo se permiten archivos de imagen'), false);
+  }
+};
+
+const upload = multer({
+  storage: storage,
+  fileFilter: fileFilter,
+  limits: {
+    fileSize: 5 * 1024 * 1024 // 5MB máximo
+  }
+});
 
 // Registro de nuevo usuario
 router.post('/register', async (req, res) => {
@@ -430,18 +469,26 @@ router.put('/change-password', authenticateToken, async (req, res) => {
 });
 
 // Subir foto de perfil
-router.post('/upload-photo', authenticateToken, async (req, res) => {
+router.post('/upload-photo', authenticateToken, upload.single('photo'), async (req, res) => {
   try {
-    // Esta ruta necesitará middleware de multer para manejar archivos
-    // Por ahora, simularemos que recibe una URL de foto
-    const { photoUrl } = req.body;
-    
-    if (!photoUrl) {
+    if (!req.file) {
       return res.status(400).json({
         success: false,
-        message: 'URL de foto requerida'
+        message: 'No se recibió ningún archivo'
       });
     }
+
+    // Eliminar foto anterior si existe
+    const user = await User.findById(req.user.id);
+    if (user.photo) {
+      const oldPhotoPath = path.join(__dirname, '../uploads/profiles', path.basename(user.photo));
+      if (fs.existsSync(oldPhotoPath)) {
+        fs.unlinkSync(oldPhotoPath);
+      }
+    }
+
+    // Generar URL de la nueva foto
+    const photoUrl = `/uploads/profiles/${req.file.filename}`;
 
     // Actualizar foto en el usuario
     const updatedUser = await User.findByIdAndUpdate(
@@ -460,10 +507,24 @@ router.post('/upload-photo', authenticateToken, async (req, res) => {
     res.json({
       success: true,
       message: 'Foto actualizada exitosamente',
+      photoUrl: photoUrl,
       user: updatedUser
     });
   } catch (error) {
     console.error('Error uploading photo:', error);
+    
+    // Eliminar archivo si hubo error
+    if (req.file && fs.existsSync(req.file.path)) {
+      fs.unlinkSync(req.file.path);
+    }
+    
+    if (error.message === 'Solo se permiten archivos de imagen') {
+      return res.status(400).json({
+        success: false,
+        message: error.message
+      });
+    }
+    
     res.status(500).json({
       success: false,
       message: 'Error subiendo foto'
