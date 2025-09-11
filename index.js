@@ -8,16 +8,58 @@ require('dotenv').config();
 
 const app = express();
 const server = http.createServer(app);
+
+// Build allowed origins from ENV and sensible localhost defaults
+const DEFAULT_ORIGINS = [
+  'http://localhost:3000',
+  'http://localhost:5173',
+  'http://localhost:5174',
+  'http://localhost:8080',
+  'http://127.0.0.1:3000',
+  'http://127.0.0.1:5173',
+  'http://127.0.0.1:8080',
+];
+const envOriginsRaw = (process.env.ALLOWED_ORIGINS || process.env.CLIENT_ORIGINS || '')
+  .split(',')
+  .map((s) => s.trim())
+  .filter(Boolean);
+const ALLOWED_ORIGINS = Array.from(new Set([...DEFAULT_ORIGINS, ...envOriginsRaw]));
+
+// Express CORS options (supports credentials + preflight)
+const corsOptions = {
+  origin: (origin, callback) => {
+    // Allow non-browser requests (e.g., curl, server-to-server)
+    if (!origin) return callback(null, true);
+    if (ALLOWED_ORIGINS.includes(origin)) return callback(null, true);
+    // Loosen for any localhost/127.0.0.1 port in dev
+    try {
+      const u = new URL(origin);
+      if ((u.hostname === 'localhost' || u.hostname === '127.0.0.1') && (u.protocol === 'http:' || u.protocol === 'https:')) {
+        return callback(null, true);
+      }
+    } catch (_) {
+      // ignore URL parse errors and fall through to rejection
+    }
+    return callback(new Error(`Not allowed by CORS: ${origin}`));
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+};
+
+// Apply CORS before JSON/static so uploads also get proper headers
+app.use(cors(corsOptions));
+app.options('*', cors(corsOptions));
+app.use(express.json());
+
+// Socket.IO with aligned CORS allowlist
 const io = socketIo(server, {
   cors: {
-    origin: ["http://localhost:3000", "http://localhost:5173", "http://localhost:8080"],
-    methods: ["GET", "POST"],
-    credentials: true
-  }
+    origin: ALLOWED_ORIGINS,
+    methods: ['GET', 'POST'],
+    credentials: true,
+  },
 });
-
-app.use(cors());
-app.use(express.json());
 
 // Servir archivos estáticos de uploads
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
