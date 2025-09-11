@@ -274,9 +274,13 @@ router.get('/orgchart', authenticateToken, async (req, res) => {
     const headPeople = findByName('David') || null;
 
     const nodes = [];
-    const mk = (id, title, name, level, parentId = null, user = null, description = '') => ({
-      id, title, name, level, parentId, userId: user?._id || null, description,
-      status: user ? 'filled' : 'vacant'
+    const mk = (id, title, name, level, parentId = null, user = null, description = '', isTeam = false) => ({
+      id, title, name, level, parentId, description,
+      // Multi-asignación compatible: preferimos assignees; userId/name se mantienen por compatibilidad
+      assignees: user ? [{ userId: user._id, name: user.name, email: user.email }] : [],
+      userId: user?._id || null,
+      status: user ? 'filled' : 'vacant',
+      isTeam
     });
 
     // Nivel 1
@@ -284,9 +288,9 @@ router.get('/orgchart', authenticateToken, async (req, res) => {
       'Visión estratégica, liderazgo general y toma de decisiones ejecutivas'));
 
     // Nivel 2
-    nodes.push(mk('cto', 'CTO', cto?.name || 'Jacobo', 2, 'ceo', cto, 'Innovación tecnológica y desarrollo técnico'));
-    nodes.push(mk('coo', 'COO', coo?.name || 'Luisa', 2, 'ceo', coo, 'Rendimiento de equipos y operaciones'));
-    nodes.push(mk('clo', 'CLO', clo?.name || 'Isabella', 2, 'ceo', clo, 'Aspectos legales, contractuales y estructurales'));
+  nodes.push(mk('cto', 'CTO', cto?.name || 'Jacobo', 2, 'ceo', cto, 'Innovación tecnológica y desarrollo técnico'));
+  nodes.push(mk('coo', 'COO', coo?.name || 'Luisa', 2, 'ceo', coo, 'Rendimiento de equipos y operaciones'));
+  nodes.push(mk('clo', 'CLO', clo?.name || 'Isabella', 2, 'ceo', clo, 'Aspectos legales, contractuales y estructurales'));
 
     // Nivel 3
     nodes.push(mk('head-people', 'Head of People & Growth', headPeople?.name || 'David', 3, 'ceo', headPeople,
@@ -296,10 +300,10 @@ router.get('/orgchart', authenticateToken, async (req, res) => {
     nodes.push(mk('head-marketing', 'Head of Marketing', 'Por Contratar', 3, 'ceo', null));
 
     // Nivel 4 (equipos base vacantes)
-    nodes.push(mk('team-dev', 'Equipo de Desarrollo', 'Por Contratar', 4, 'head-product', null));
-    nodes.push(mk('team-design', 'Equipo de Diseño', 'Por Contratar', 4, 'head-product', null));
-    nodes.push(mk('team-sales', 'Equipo Comercial', 'Por Contratar', 4, 'head-sales', null));
-    nodes.push(mk('team-mkt', 'Equipo de Marketing', 'Por Contratar', 4, 'head-marketing', null));
+  nodes.push(mk('team-dev', 'Equipo de Desarrollo', 'Equipo', 4, 'head-product', null, 'Developers, DevOps, QA', true));
+  nodes.push(mk('team-design', 'Equipo de Diseño', 'Equipo', 4, 'head-product', null, 'UX/UI, Diseño gráfico', true));
+  nodes.push(mk('team-sales', 'Equipo Comercial', 'Equipo', 4, 'head-sales', null, 'Ventas, Customer Success', true));
+  nodes.push(mk('team-mkt', 'Equipo de Marketing', 'Equipo', 4, 'head-marketing', null, 'Content, Social Media, SEO', true));
 
     const chart = { nodes, updatedAt: new Date().toISOString() };
     return res.json({ success: true, data: chart, message: 'Fallback org chart generated' });
