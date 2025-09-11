@@ -1,7 +1,8 @@
 const express = require('express');
 const router = express.Router();
 const User = require('../models/User'); // Cambiado de Team a User
-const { authenticateToken } = require('../middleware/auth');
+const Setting = require('../models/Setting');
+const { authenticateToken, requireRole } = require('../middleware/auth');
 
 // Middleware de autenticación para todas las rutas
 router.use(authenticateToken);
@@ -243,3 +244,88 @@ router.put('/:id/activate', checkTeamPermissions('edit'), async (req, res) => {
 });
 
 module.exports = router;
+
+// --- Organigrama (Org Chart) Endpoints ---
+// Nota: Se agregan después del export para mantener compatibilidad con imports existentes.
+
+// Obtener organigrama
+router.get('/orgchart', authenticateToken, async (req, res) => {
+  try {
+    // Intentar cargar desde Setting
+    let setting = await Setting.findOne({ key: 'orgchart' });
+    if (setting && setting.value) {
+      try {
+        const chart = JSON.parse(setting.value);
+        return res.json({ success: true, data: chart });
+      } catch (e) {
+        // Si json inválido, continuar a fallback
+        console.warn('Invalid orgchart JSON in settings, regenerating fallback');
+      }
+    }
+
+    // Fallback: generar organigrama básico desde usuarios
+    const users = await User.find({ isActive: true }).select('-password');
+    const findByName = (name) => users.find(u => (u.name || '').toLowerCase().includes(name.toLowerCase()));
+
+    const ceo = findByName('Sebastian') || null;
+    const cto = findByName('Jacobo') || null;
+    const coo = findByName('Luisa') || null;
+    const clo = findByName('Isabella') || null;
+    const headPeople = findByName('David') || null;
+
+    const nodes = [];
+    const mk = (id, title, name, level, parentId = null, user = null, description = '') => ({
+      id, title, name, level, parentId, userId: user?._id || null, description,
+      status: user ? 'filled' : 'vacant'
+    });
+
+    // Nivel 1
+    nodes.push(mk('ceo', 'CEO & Fundador', ceo?.name || 'Sebastian', 1, null, ceo,
+      'Visión estratégica, liderazgo general y toma de decisiones ejecutivas'));
+
+    // Nivel 2
+    nodes.push(mk('cto', 'CTO', cto?.name || 'Jacobo', 2, 'ceo', cto, 'Innovación tecnológica y desarrollo técnico'));
+    nodes.push(mk('coo', 'COO', coo?.name || 'Luisa', 2, 'ceo', coo, 'Rendimiento de equipos y operaciones'));
+    nodes.push(mk('clo', 'CLO', clo?.name || 'Isabella', 2, 'ceo', clo, 'Aspectos legales, contractuales y estructurales'));
+
+    // Nivel 3
+    nodes.push(mk('head-people', 'Head of People & Growth', headPeople?.name || 'David', 3, 'ceo', headPeople,
+      'Desarrollo y crecimiento del talento humano'));
+    nodes.push(mk('head-product', 'Head of Product', 'Por Contratar', 3, 'ceo', null));
+    nodes.push(mk('head-sales', 'Head of Sales', 'Por Contratar', 3, 'ceo', null));
+    nodes.push(mk('head-marketing', 'Head of Marketing', 'Por Contratar', 3, 'ceo', null));
+
+    // Nivel 4 (equipos base vacantes)
+    nodes.push(mk('team-dev', 'Equipo de Desarrollo', 'Por Contratar', 4, 'head-product', null));
+    nodes.push(mk('team-design', 'Equipo de Diseño', 'Por Contratar', 4, 'head-product', null));
+    nodes.push(mk('team-sales', 'Equipo Comercial', 'Por Contratar', 4, 'head-sales', null));
+    nodes.push(mk('team-mkt', 'Equipo de Marketing', 'Por Contratar', 4, 'head-marketing', null));
+
+    const chart = { nodes, updatedAt: new Date().toISOString() };
+    return res.json({ success: true, data: chart, message: 'Fallback org chart generated' });
+  } catch (error) {
+    console.error('Error getting orgchart:', error);
+    res.status(500).json({ success: false, message: 'Error al obtener organigrama', error: error.message });
+  }
+});
+
+// Guardar/actualizar organigrama (solo admin)
+router.put('/orgchart', authenticateToken, requireRole('admin'), async (req, res) => {
+  try {
+    const chart = req.body;
+    if (!chart || typeof chart !== 'object' || !Array.isArray(chart.nodes)) {
+      return res.status(400).json({ success: false, message: 'Formato inválido de organigrama' });
+    }
+    const toSave = { ...chart, updatedAt: new Date().toISOString() };
+    const json = JSON.stringify(toSave);
+    const setting = await Setting.findOneAndUpdate(
+      { key: 'orgchart' },
+      { key: 'orgchart', value: json },
+      { upsert: true, new: true }
+    );
+    res.json({ success: true, data: toSave });
+  } catch (error) {
+    console.error('Error saving orgchart:', error);
+    res.status(500).json({ success: false, message: 'Error al guardar organigrama', error: error.message });
+  }
+});
