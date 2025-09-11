@@ -119,6 +119,95 @@ router.post('/', checkTeamPermissions('create'), async (req, res) => {
   }
 });
 
+// --- Organigrama (Org Chart) Endpoints ---
+// Colocados antes de rutas con parámetros (/:id) para evitar colisiones de rutas
+
+// Obtener organigrama
+router.get('/orgchart', authenticateToken, async (req, res) => {
+  try {
+    // Intentar cargar desde Setting
+    let setting = await Setting.findOne({ key: 'orgchart' });
+    if (setting && setting.value) {
+      try {
+        const chart = JSON.parse(setting.value);
+        return res.json({ success: true, data: chart });
+      } catch (e) {
+        // Si json inválido, continuar a fallback
+        console.warn('Invalid orgchart JSON in settings, regenerating fallback');
+      }
+    }
+
+    // Fallback: generar organigrama básico desde usuarios
+    const users = await User.find({ isActive: true }).select('-password');
+    const findByName = (name) => users.find(u => (u.name || '').toLowerCase().includes(name.toLowerCase()));
+
+    const ceo = findByName('Sebastian') || null;
+    const cto = findByName('Jacobo') || null;
+    const coo = findByName('Luisa') || null;
+    const clo = findByName('Isabella') || null;
+    const headPeople = findByName('David') || null;
+
+    const nodes = [];
+    const mk = (id, title, name, level, parentId = null, user = null, description = '', isTeam = false) => ({
+      id, title, name, level, parentId, description,
+      // Multi-asignación compatible: preferimos assignees; userId/name se mantienen por compatibilidad
+      assignees: user ? [{ userId: user._id, name: user.name, email: user.email }] : [],
+      userId: user?._id || null,
+      status: user ? 'filled' : 'vacant',
+      isTeam
+    });
+
+    // Nivel 1
+    nodes.push(mk('ceo', 'CEO & Fundador', ceo?.name || 'Sebastian', 1, null, ceo,
+      'Visión estratégica, liderazgo general y toma de decisiones ejecutivas'));
+
+    // Nivel 2
+    nodes.push(mk('cto', 'CTO', cto?.name || 'Jacobo', 2, 'ceo', cto, 'Innovación tecnológica y desarrollo técnico'));
+    nodes.push(mk('coo', 'COO', coo?.name || 'Luisa', 2, 'ceo', coo, 'Rendimiento de equipos y operaciones'));
+    nodes.push(mk('clo', 'CLO', clo?.name || 'Isabella', 2, 'ceo', clo, 'Aspectos legales, contractuales y estructurales'));
+
+    // Nivel 3
+    nodes.push(mk('head-people', 'Head of People & Growth', headPeople?.name || 'David', 3, 'ceo', headPeople,
+      'Desarrollo y crecimiento del talento humano'));
+    nodes.push(mk('head-product', 'Head of Product', 'Por Contratar', 3, 'ceo', null));
+    nodes.push(mk('head-sales', 'Head of Sales', 'Por Contratar', 3, 'ceo', null));
+    nodes.push(mk('head-marketing', 'Head of Marketing', 'Por Contratar', 3, 'ceo', null));
+
+    // Nivel 4 (equipos base vacantes)
+    nodes.push(mk('team-dev', 'Equipo de Desarrollo', 'Equipo', 4, 'head-product', null, 'Developers, DevOps, QA', true));
+    nodes.push(mk('team-design', 'Equipo de Diseño', 'Equipo', 4, 'head-product', null, 'UX/UI, Diseño gráfico', true));
+    nodes.push(mk('team-sales', 'Equipo Comercial', 'Equipo', 4, 'head-sales', null, 'Ventas, Customer Success', true));
+    nodes.push(mk('team-mkt', 'Equipo de Marketing', 'Equipo', 4, 'head-marketing', null, 'Content, Social Media, SEO', true));
+
+    const chart = { nodes, updatedAt: new Date().toISOString() };
+    return res.json({ success: true, data: chart, message: 'Fallback org chart generated' });
+  } catch (error) {
+    console.error('Error getting orgchart:', error);
+    res.status(500).json({ success: false, message: 'Error al obtener organigrama', error: error.message });
+  }
+});
+
+// Guardar/actualizar organigrama (solo admin)
+router.put('/orgchart', authenticateToken, requireRole('admin'), async (req, res) => {
+  try {
+    const chart = req.body;
+    if (!chart || typeof chart !== 'object' || !Array.isArray(chart.nodes)) {
+      return res.status(400).json({ success: false, message: 'Formato inválido de organigrama' });
+    }
+    const toSave = { ...chart, updatedAt: new Date().toISOString() };
+    const json = JSON.stringify(toSave);
+    await Setting.findOneAndUpdate(
+      { key: 'orgchart' },
+      { key: 'orgchart', value: json },
+      { upsert: true, new: true }
+    );
+    res.json({ success: true, data: toSave });
+  } catch (error) {
+    console.error('Error saving orgchart:', error);
+    res.status(500).json({ success: false, message: 'Error al guardar organigrama', error: error.message });
+  }
+});
+
 // Actualizar miembro del equipo
 router.put('/:id', checkTeamPermissions('edit'), async (req, res) => {
   try {
@@ -244,92 +333,3 @@ router.put('/:id/activate', checkTeamPermissions('edit'), async (req, res) => {
 });
 
 module.exports = router;
-
-// --- Organigrama (Org Chart) Endpoints ---
-// Nota: Se agregan después del export para mantener compatibilidad con imports existentes.
-
-// Obtener organigrama
-router.get('/orgchart', authenticateToken, async (req, res) => {
-  try {
-    // Intentar cargar desde Setting
-    let setting = await Setting.findOne({ key: 'orgchart' });
-    if (setting && setting.value) {
-      try {
-        const chart = JSON.parse(setting.value);
-        return res.json({ success: true, data: chart });
-      } catch (e) {
-        // Si json inválido, continuar a fallback
-        console.warn('Invalid orgchart JSON in settings, regenerating fallback');
-      }
-    }
-
-    // Fallback: generar organigrama básico desde usuarios
-    const users = await User.find({ isActive: true }).select('-password');
-    const findByName = (name) => users.find(u => (u.name || '').toLowerCase().includes(name.toLowerCase()));
-
-    const ceo = findByName('Sebastian') || null;
-    const cto = findByName('Jacobo') || null;
-    const coo = findByName('Luisa') || null;
-    const clo = findByName('Isabella') || null;
-    const headPeople = findByName('David') || null;
-
-    const nodes = [];
-    const mk = (id, title, name, level, parentId = null, user = null, description = '', isTeam = false) => ({
-      id, title, name, level, parentId, description,
-      // Multi-asignación compatible: preferimos assignees; userId/name se mantienen por compatibilidad
-      assignees: user ? [{ userId: user._id, name: user.name, email: user.email }] : [],
-      userId: user?._id || null,
-      status: user ? 'filled' : 'vacant',
-      isTeam
-    });
-
-    // Nivel 1
-    nodes.push(mk('ceo', 'CEO & Fundador', ceo?.name || 'Sebastian', 1, null, ceo,
-      'Visión estratégica, liderazgo general y toma de decisiones ejecutivas'));
-
-    // Nivel 2
-  nodes.push(mk('cto', 'CTO', cto?.name || 'Jacobo', 2, 'ceo', cto, 'Innovación tecnológica y desarrollo técnico'));
-  nodes.push(mk('coo', 'COO', coo?.name || 'Luisa', 2, 'ceo', coo, 'Rendimiento de equipos y operaciones'));
-  nodes.push(mk('clo', 'CLO', clo?.name || 'Isabella', 2, 'ceo', clo, 'Aspectos legales, contractuales y estructurales'));
-
-    // Nivel 3
-    nodes.push(mk('head-people', 'Head of People & Growth', headPeople?.name || 'David', 3, 'ceo', headPeople,
-      'Desarrollo y crecimiento del talento humano'));
-    nodes.push(mk('head-product', 'Head of Product', 'Por Contratar', 3, 'ceo', null));
-    nodes.push(mk('head-sales', 'Head of Sales', 'Por Contratar', 3, 'ceo', null));
-    nodes.push(mk('head-marketing', 'Head of Marketing', 'Por Contratar', 3, 'ceo', null));
-
-    // Nivel 4 (equipos base vacantes)
-  nodes.push(mk('team-dev', 'Equipo de Desarrollo', 'Equipo', 4, 'head-product', null, 'Developers, DevOps, QA', true));
-  nodes.push(mk('team-design', 'Equipo de Diseño', 'Equipo', 4, 'head-product', null, 'UX/UI, Diseño gráfico', true));
-  nodes.push(mk('team-sales', 'Equipo Comercial', 'Equipo', 4, 'head-sales', null, 'Ventas, Customer Success', true));
-  nodes.push(mk('team-mkt', 'Equipo de Marketing', 'Equipo', 4, 'head-marketing', null, 'Content, Social Media, SEO', true));
-
-    const chart = { nodes, updatedAt: new Date().toISOString() };
-    return res.json({ success: true, data: chart, message: 'Fallback org chart generated' });
-  } catch (error) {
-    console.error('Error getting orgchart:', error);
-    res.status(500).json({ success: false, message: 'Error al obtener organigrama', error: error.message });
-  }
-});
-
-// Guardar/actualizar organigrama (solo admin)
-router.put('/orgchart', authenticateToken, requireRole('admin'), async (req, res) => {
-  try {
-    const chart = req.body;
-    if (!chart || typeof chart !== 'object' || !Array.isArray(chart.nodes)) {
-      return res.status(400).json({ success: false, message: 'Formato inválido de organigrama' });
-    }
-    const toSave = { ...chart, updatedAt: new Date().toISOString() };
-    const json = JSON.stringify(toSave);
-    const setting = await Setting.findOneAndUpdate(
-      { key: 'orgchart' },
-      { key: 'orgchart', value: json },
-      { upsert: true, new: true }
-    );
-    res.json({ success: true, data: toSave });
-  } catch (error) {
-    console.error('Error saving orgchart:', error);
-    res.status(500).json({ success: false, message: 'Error al guardar organigrama', error: error.message });
-  }
-});
