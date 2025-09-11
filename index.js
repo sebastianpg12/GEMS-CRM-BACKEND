@@ -81,11 +81,27 @@ db.once('open', () => {
 // Socket.io connection handling
 io.on('connection', (socket) => {
   console.log('User connected:', socket.id);
+  // Presence tracking maps
+  // userId -> connection count
+  if (!io.onlineUsers) {
+    io.onlineUsers = new Map();
+  }
+  // socket.id -> userId
+  if (!io.socketToUser) {
+    io.socketToUser = new Map();
+  }
   
   // Join user to their personal room
   socket.on('join_user_room', (userId) => {
     socket.join(`user_${userId}`);
     console.log(`User ${userId} joined their room`);
+  // Map this socket to user
+  io.socketToUser.set(socket.id, userId);
+  const current = io.onlineUsers.get(userId) || 0;
+  io.onlineUsers.set(userId, current + 1);
+  // Broadcast presence update to all clients
+  const onlineList = Array.from(io.onlineUsers.keys());
+  io.emit('presence_update', onlineList);
   });
   
   // Join chat room
@@ -118,6 +134,20 @@ io.on('connection', (socket) => {
   
   socket.on('disconnect', () => {
     console.log('User disconnected:', socket.id);
+    // Update presence maps
+    const userId = io.socketToUser.get(socket.id);
+    if (userId) {
+      const current = io.onlineUsers.get(userId) || 0;
+      if (current <= 1) {
+        io.onlineUsers.delete(userId);
+      } else {
+        io.onlineUsers.set(userId, current - 1);
+      }
+      io.socketToUser.delete(socket.id);
+      // Broadcast updated presence
+      const onlineList = Array.from(io.onlineUsers.keys());
+      io.emit('presence_update', onlineList);
+    }
   });
 });
 
