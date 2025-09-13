@@ -9,7 +9,7 @@ router.post('/', async (req, res) => {
     const conversation = new ProspectConversation({
       prospectName,
       company,
-      createdBy,
+      createdBy: createdBy || null,
       messages: initialMessage ? [{ role: 'user', content: initialMessage }] : []
     })
     await conversation.save()

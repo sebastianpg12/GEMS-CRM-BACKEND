@@ -9,7 +9,7 @@ const MessageSchema = new mongoose.Schema({
 const ProspectConversationSchema = new mongoose.Schema({
   prospectName: { type: String, required: true },
   company: { type: String },
-  createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: false },
   messages: [MessageSchema],
   lastUpdated: { type: Date, default: Date.now }
 })
