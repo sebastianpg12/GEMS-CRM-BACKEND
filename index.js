@@ -60,6 +60,7 @@ const settingsRoutes = require('./routes/settings');
 const teamRoutes = require('./routes/team');
 const reportsRoutes = require('./routes/reports');
 const chatRoutes = require('./routes/chat');
+const prospectsRoutes = require('./routes/prospects');
 
 // Usar rutas
 app.use('/api/auth', authRoutes);
@@ -77,6 +78,7 @@ app.use('/api/settings', settingsRoutes);
 app.use('/api/team', teamRoutes);
 app.use('/api/reports', reportsRoutes);
 app.use('/api/chat', chatRoutes);
+app.use('/api/prospects', prospectsRoutes);
 
 // Conexión a MongoDB usando .env
 mongoose.connect(process.env.MONGO_URI, {
