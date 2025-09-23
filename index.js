@@ -192,6 +192,7 @@ wppClient = new Client({
       '--disable-accelerated-2d-canvas',
       '--no-first-run',
       '--no-zygote',
+
       async function loadSessionFromDb() {
         const sessionDoc = await WppSession.findOne({});
         if (sessionDoc && sessionDoc.session && Object.keys(sessionDoc.session).length > 0) {
