@@ -49,21 +49,38 @@ router.post('/', async (req, res) => {
   try {
     console.log('📝 Creating activity with data:', req.body);
     console.log('👤 AssignedTo field:', req.body.assignedTo);
-    
+
     const activity = new Activity(req.body);
     await activity.save();
-    
+
     console.log('✅ Activity saved with ID:', activity._id);
     console.log('👤 Saved assignedTo:', activity.assignedTo);
-    
+
     // Poblar la actividad creada antes de enviarla
     const populatedActivity = await Activity.findById(activity._id)
       .populate('clientId', 'name email company')
       .populate('assignedTo', 'name email role photo')
       .populate('createdBy', 'name email');
-    
+
     console.log('📋 Populated activity:', populatedActivity);
-    
+
+    // --- Enviar notificación a WhatsApp (avisos) ---
+    try {
+      // Configura el groupId de la sección 'avisos' de tu comunidad
+      const groupId = process.env.WPP_AVISOS_GROUP_ID || '<AQUÍ_EL_ID_DEL_GRUPO>'; // Reemplaza por el ID real
+      // Mensaje personalizado
+      const msg = `📝 Nueva tarea creada:\nTítulo: ${populatedActivity.title}\nEncargado: ${populatedActivity.assignedTo?.name || 'Sin asignar'}\nCliente: ${populatedActivity.clientId?.name || ''}\nVencimiento: ${populatedActivity.dueDate ? new Date(populatedActivity.dueDate).toLocaleDateString() : 'Sin fecha'}\nDescripción: ${populatedActivity.description || ''}`;
+      // Llamada al endpoint centralizado
+      await fetch('https://gems-crm-backend.onrender.com/api/wpp-send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ groupId, message: msg })
+      });
+      console.log('✅ Notificación enviada a WhatsApp avisos');
+    } catch (wppErr) {
+      console.error('❌ Error enviando notificación WhatsApp:', wppErr);
+    }
+
     res.json(populatedActivity);
   } catch (error) {
     console.error('❌ Error creating activity:', error);

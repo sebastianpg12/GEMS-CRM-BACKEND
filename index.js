@@ -5,21 +5,15 @@ const path = require('path');
 const http = require('http');
 const socketIo = require('socket.io');
 require('dotenv').config();
-
-const app = express();
-const server = http.createServer(app);
-
 // CORS sencillo: refleja el origin del request (permite todos los orígenes) y soporta credenciales
 const corsOptions = {
   origin: true,
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
 };
 
 // Apply CORS before JSON/static so uploads also get proper headers
 app.use(cors(corsOptions));
-app.options('*', cors(corsOptions));
 app.use(express.json());
 
 // Socket.IO CORS: permitir cualquier origen (útil para desarrollo y apps SPA)
@@ -28,14 +22,17 @@ const io = socketIo(server, {
     origin: '*',
     methods: ['GET', 'POST'],
     credentials: true,
-  },
+  }
 });
+
+let avisosGroupId = null; // Guardar el ID del grupo 'avisos' automáticamente
 
 // Servir archivos estáticos de uploads
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Create uploads/chat directory if it doesn't exist
 const fs = require('fs');
+
 const chatUploadsDir = path.join(__dirname, 'uploads', 'chat');
 if (!fs.existsSync(chatUploadsDir)) {
   fs.mkdirSync(chatUploadsDir, { recursive: true });
@@ -55,10 +52,12 @@ const followupsRoutes = require('./routes/followups');
 const issuesRoutes = require('./routes/issues');
 const notificationsRoutes = require('./routes/notifications');
 const docsRoutes = require('./routes/docs');
+
 const minutesRoutes = require('./routes/minutes');
 const settingsRoutes = require('./routes/settings');
 const teamRoutes = require('./routes/team');
 const reportsRoutes = require('./routes/reports');
+
 const chatRoutes = require('./routes/chat');
 const prospectsRoutes = require('./routes/prospects');
 
@@ -171,9 +170,25 @@ let qrCode = null;
 let wppReady = false;
 let wppClient = null;
 
+
 wppClient = new Client({
-    authStrategy: new LocalAuth(),
-    puppeteer: { headless: true }
+  authStrategy: new LocalAuth({
+    clientId: 'crm-gems-bot', // Identificador único para la sesión
+    dataPath: './wpp-session' // Carpeta persistente para la sesión
+  }),
+  puppeteer: {
+    headless: true,
+    args: [
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-dev-shm-usage',
+      '--disable-accelerated-2d-canvas',
+      '--no-first-run',
+      '--no-zygote',
+      '--single-process',
+      '--disable-gpu'
+    ]
+  }
 });
 
 wppClient.on('qr', (qr) => {
@@ -187,9 +202,24 @@ wppClient.on('ready', () => {
     console.log('WhatsApp vinculado y listo para enviar mensajes');
 });
 
-wppClient.on('auth_failure', () => {
-    wppReady = false;
-    console.error('Error de autenticación WhatsApp. Vuelve a escanear el QR.');
+
+wppClient.on('auth_failure', (msg) => {
+  wppReady = false;
+  console.error('Error de autenticación WhatsApp:', msg);
+  // Intentar reiniciar el cliente automáticamente
+  setTimeout(() => {
+    console.log('Reiniciando WhatsApp Web Client tras fallo de autenticación...');
+    wppClient.destroy().then(() => wppClient.initialize());
+  }, 5000);
+});
+wppClient.on('disconnected', (reason) => {
+  wppReady = false;
+  console.warn('WhatsApp Web desconectado:', reason);
+  // Intentar reiniciar el cliente automáticamente
+  setTimeout(() => {
+    console.log('Reiniciando WhatsApp Web Client tras desconexión...');
+    wppClient.destroy().then(() => wppClient.initialize());
+  }, 5000);
 });
 
 wppClient.initialize();
@@ -215,6 +245,21 @@ app.post('/api/wpp-send', async (req, res) => {
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
+});
+
+// Endpoint para listar grupos/chats de WhatsApp (solo para uso interno)
+app.get('/api/wpp-groups', async (req, res) => {
+  if (!wppReady) return res.status(503).json({ error: 'WhatsApp no vinculado' });
+  try {
+    const chats = await wppClient.getChats();
+    // Filtrar solo grupos
+    const groups = chats.filter(chat => chat.isGroup);
+    // Mapear nombre e ID
+    const result = groups.map(g => ({ name: g.name, id: g.id._serialized }));
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 const PORT = process.env.PORT || 4000;
