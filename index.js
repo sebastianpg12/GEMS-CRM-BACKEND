@@ -240,15 +240,17 @@ app.get('/api/wpp-qr', (req, res) => {
 });
 
 // Endpoint para enviar mensaje a grupo
+// Endpoint para enviar mensaje a grupo 'avisos' automáticamente
 app.post('/api/wpp-send', async (req, res) => {
-    if (!wppReady) return res.status(503).json({ error: 'WhatsApp no vinculado' });
-    const { groupId, message } = req.body;
-    try {
-        await wppClient.sendMessage(groupId, message);
-        res.json({ sent: true });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
-    }
+  if (!wppReady) return res.status(503).json({ error: 'WhatsApp no vinculado' });
+  const { message } = req.body;
+  if (!avisosGroupId) return res.status(404).json({ error: 'No se encontró el grupo "avisos" vinculado' });
+  try {
+    await wppClient.sendMessage(avisosGroupId, message);
+    res.json({ sent: true });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // Endpoint para listar grupos/chats de WhatsApp (solo para uso interno)
