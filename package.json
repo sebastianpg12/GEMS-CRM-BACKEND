@@ -14,6 +14,9 @@
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^7.0.3",
     "multer": "^2.0.2",
-    "socket.io": "^4.8.1"
+    "puppeteer": "^24.22.1",
+    "qrcode-terminal": "^0.12.0",
+    "socket.io": "^4.8.1",
+    "whatsapp-web.js": "^1.34.1"
   }
 }

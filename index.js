@@ -165,6 +165,58 @@ io.on('connection', (socket) => {
   });
 });
 
+// --- INTEGRACIÓN WHATSAPP WEB ---
+const { Client, LocalAuth } = require('whatsapp-web.js');
+let qrCode = null;
+let wppReady = false;
+let wppClient = null;
+
+wppClient = new Client({
+    authStrategy: new LocalAuth(),
+    puppeteer: { headless: true }
+});
+
+wppClient.on('qr', (qr) => {
+    qrCode = qr;
+    wppReady = false;
+    console.log('QR actualizado para vincular WhatsApp Business');
+});
+
+wppClient.on('ready', () => {
+    wppReady = true;
+    console.log('WhatsApp vinculado y listo para enviar mensajes');
+});
+
+wppClient.on('auth_failure', () => {
+    wppReady = false;
+    console.error('Error de autenticación WhatsApp. Vuelve a escanear el QR.');
+});
+
+wppClient.initialize();
+
+// Endpoint para obtener el QR
+app.get('/api/wpp-qr', (req, res) => {
+    if (qrCode && !wppReady) {
+        res.json({ qr: qrCode });
+    } else if (wppReady) {
+        res.json({ status: 'ready' });
+    } else {
+        res.status(503).json({ error: 'QR no disponible aún' });
+    }
+});
+
+// Endpoint para enviar mensaje a grupo
+app.post('/api/wpp-send', async (req, res) => {
+    if (!wppReady) return res.status(503).json({ error: 'WhatsApp no vinculado' });
+    const { groupId, message } = req.body;
+    try {
+        await wppClient.sendMessage(groupId, message);
+        res.json({ sent: true });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 const PORT = process.env.PORT || 4000;
 server.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
