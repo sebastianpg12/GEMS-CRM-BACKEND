@@ -12,6 +12,10 @@ const corsOptions = {
   allowedHeaders: ['Content-Type', 'Authorization'],
 };
 
+
+const app = express();
+const server = http.createServer(app);
+
 // Apply CORS before JSON/static so uploads also get proper headers
 app.use(cors(corsOptions));
 app.use(express.json());
