@@ -266,6 +266,10 @@ app.get('/api/wpp-groups', async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
+// Endpoint para consultar el estado de la sesión de WhatsApp
+app.get('/api/wpp-status', (req, res) => {
+  res.json({ ready: wppReady });
+});
 });
 
 const PORT = process.env.PORT || 4000;
