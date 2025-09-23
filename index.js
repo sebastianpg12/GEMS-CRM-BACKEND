@@ -170,6 +170,7 @@ io.on('connection', (socket) => {
 
 // --- INTEGRACIÓN WHATSAPP WEB ---
 const { Client, LocalAuth } = require('whatsapp-web.js');
+const WppStatus = require('./models/WppStatus');
 let qrCode = null;
 let wppReady = false;
 let wppClient = null;
@@ -199,17 +200,20 @@ wppClient.on('qr', (qr) => {
     qrCode = qr;
     wppReady = false;
     console.log('QR actualizado para vincular WhatsApp Business');
+  WppStatus.findOneAndUpdate({}, { ready: false, updatedAt: new Date() }, { upsert: true }).exec();
 });
 
 wppClient.on('ready', () => {
     wppReady = true;
     console.log('WhatsApp vinculado y listo para enviar mensajes');
+  WppStatus.findOneAndUpdate({}, { ready: true, updatedAt: new Date() }, { upsert: true }).exec();
 });
 
 
 wppClient.on('auth_failure', (msg) => {
   wppReady = false;
   console.error('Error de autenticación WhatsApp:', msg);
+  WppStatus.findOneAndUpdate({}, { ready: false, updatedAt: new Date() }, { upsert: true }).exec();
   // Intentar reiniciar el cliente automáticamente
   setTimeout(() => {
     console.log('Reiniciando WhatsApp Web Client tras fallo de autenticación...');
@@ -219,6 +223,7 @@ wppClient.on('auth_failure', (msg) => {
 wppClient.on('disconnected', (reason) => {
   wppReady = false;
   console.warn('WhatsApp Web desconectado:', reason);
+  WppStatus.findOneAndUpdate({}, { ready: false, updatedAt: new Date() }, { upsert: true }).exec();
   // Intentar reiniciar el cliente automáticamente
   setTimeout(() => {
     console.log('Reiniciando WhatsApp Web Client tras desconexión...');
@@ -269,8 +274,13 @@ app.get('/api/wpp-groups', async (req, res) => {
 });
 
 // Endpoint para consultar el estado de la sesión de WhatsApp
-app.get('/api/wpp-status', (req, res) => {
-  res.json({ ready: wppReady });
+app.get('/api/wpp-status', async (req, res) => {
+  try {
+    const status = await WppStatus.findOne({});
+    res.json({ ready: !!(status && status.ready) });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
 });
 
 const PORT = process.env.PORT || 4000;
