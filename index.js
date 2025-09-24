@@ -193,77 +193,76 @@ wppClient = new Client({
       '--no-first-run',
       '--no-zygote',
 
-      async function loadSessionFromDb() {
-        const sessionDoc = await WppSession.findOne({});
-        if (sessionDoc && sessionDoc.session && Object.keys(sessionDoc.session).length > 0) {
-          wppSessionData = sessionDoc.session;
-          console.log('Sesión WhatsApp restaurada desde MongoDB');
-        } else {
-          wppSessionData = null;
-          console.log('No hay sesión WhatsApp en MongoDB, se requiere escanear QR');
-        }
-      }
+// --- FUNCIONES PARA SESIÓN WHATSAPP EN MONGODB ---
+async function loadSessionFromDb() {
+  const sessionDoc = await WppSession.findOne({});
+  if (sessionDoc && sessionDoc.session && Object.keys(sessionDoc.session).length > 0) {
+    wppSessionData = sessionDoc.session;
+    console.log('Sesión WhatsApp restaurada desde MongoDB');
+  } else {
+    wppSessionData = null;
+    console.log('No hay sesión WhatsApp en MongoDB, se requiere escanear QR');
+  }
+}
 
-      function saveSessionToDb(session) {
-        WppSession.findOneAndUpdate({}, { session, updatedAt: new Date() }, { upsert: true }).exec();
-      }
+function saveSessionToDb(session) {
+  WppSession.findOneAndUpdate({}, { session, updatedAt: new Date() }, { upsert: true }).exec();
+}
 
-      // Inicialización asíncrona
-      async function initWppClient() {
-        await loadSessionFromDb();
-        wppClient = new Client({
-          session: wppSessionData,
-          puppeteer: {
-            headless: true,
-            args: [
-              '--no-sandbox',
-              '--disable-setuid-sandbox',
-              '--disable-dev-shm-usage',
-              '--disable-accelerated-2d-canvas',
-              '--no-first-run',
-              '--no-zygote',
-              '--single-process',
-              '--disable-gpu'
-            ]
-          }
-        });
+async function initWppClient() {
+  await loadSessionFromDb();
+  wppClient = new Client({
+    session: wppSessionData,
+    puppeteer: {
+      headless: true,
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-accelerated-2d-canvas',
+        '--no-first-run',
+        '--no-zygote',
+        '--single-process',
+        '--disable-gpu'
+      ]
+    }
+  });
 
-        wppClient.on('qr', (qr) => {
-          qrCode = qr;
-          wppReady = false;
-          console.log('QR actualizado para vincular WhatsApp Business');
-          WppStatus.findOneAndUpdate({}, { ready: false, updatedAt: new Date() }, { upsert: true }).exec();
-        });
+  wppClient.on('qr', (qr) => {
+    qrCode = qr;
+    wppReady = false;
+    console.log('QR actualizado para vincular WhatsApp Business');
+    WppStatus.findOneAndUpdate({}, { ready: false, updatedAt: new Date() }, { upsert: true }).exec();
+  });
 
-        wppClient.on('ready', () => {
-          wppReady = true;
-          console.log('WhatsApp vinculado y listo para enviar mensajes');
-          WppStatus.findOneAndUpdate({}, { ready: true, updatedAt: new Date() }, { upsert: true }).exec();
-        });
+  wppClient.on('ready', () => {
+    wppReady = true;
+    console.log('WhatsApp vinculado y listo para enviar mensajes');
+    WppStatus.findOneAndUpdate({}, { ready: true, updatedAt: new Date() }, { upsert: true }).exec();
+  });
 
-        wppClient.on('auth_failure', (msg) => {
-          wppReady = false;
-          console.error('Error de autenticación WhatsApp:', msg);
-          WppStatus.findOneAndUpdate({}, { ready: false, updatedAt: new Date() }, { upsert: true }).exec();
-        });
+  wppClient.on('auth_failure', (msg) => {
+    wppReady = false;
+    console.error('Error de autenticación WhatsApp:', msg);
+    WppStatus.findOneAndUpdate({}, { ready: false, updatedAt: new Date() }, { upsert: true }).exec();
+  });
 
-        wppClient.on('disconnected', (reason) => {
-          wppReady = false;
-          console.warn('WhatsApp Web desconectado:', reason);
-          WppStatus.findOneAndUpdate({}, { ready: false, updatedAt: new Date() }, { upsert: true }).exec();
-        });
+  wppClient.on('disconnected', (reason) => {
+    wppReady = false;
+    console.warn('WhatsApp Web desconectado:', reason);
+    WppStatus.findOneAndUpdate({}, { ready: false, updatedAt: new Date() }, { upsert: true }).exec();
+  });
 
-        wppClient.on('authenticated', (session) => {
-          saveSessionToDb(session);
-          console.log('Sesión WhatsApp guardada en MongoDB');
-        });
+  wppClient.on('authenticated', (session) => {
+    saveSessionToDb(session);
+    console.log('Sesión WhatsApp guardada en MongoDB');
+  });
 
-        wppClient.initialize();
-      }
+  wppClient.initialize();
+}
 
-
-      // Inicializar WhatsApp Web Client con sesión en MongoDB
-      initWppClient();
+// Inicializar WhatsApp Web Client con sesión en MongoDB
+initWppClient();
 app.post('/api/wpp-send', async (req, res) => {
   if (!wppReady) return res.status(503).json({ error: 'WhatsApp no vinculado' });
   const { message } = req.body;
