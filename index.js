@@ -316,5 +316,5 @@ app.get('/api/wpp-qr', (req, res) => {
 
 const PORT = process.env.PORT || 8000;
 server.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+  console.log(`Server running on porta ${PORT}`);
 });
