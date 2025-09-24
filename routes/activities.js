@@ -90,6 +90,8 @@ router.post('/', async (req, res) => {
             if (phoneRaw.length >= 10) {
               const jid = `${phoneRaw}@s.whatsapp.net`;
               const group = allGroups[groupId];
+              // Log completo del objeto de participantes para inspección
+              console.log('[WhatsApp Mention] group.participants:', JSON.stringify(group?.participants, null, 2));
               const participants = group?.participants ? Object.keys(group.participants) : [];
               // Mostrar mapping de JID a nombre para depuración
               const participantMap = group?.participants ? group.participants : {};
