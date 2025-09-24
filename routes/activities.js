@@ -117,14 +117,12 @@ router.post('/', async (req, res) => {
             mentionReason = 'No se realizó la mención: no hay teléfono asignado al encargado.';
           }
           const msg =
-            `📝 *Nueva tarea creada*\n` +
-            `━━━━━━━━━━━━━━━━━━━\n` +
-            `*Tarea:* ${populatedActivity.title}\n` +
-            `*Encargado:* ${populatedActivity.assignedTo?.name || 'Sin asignar'} ${encargadoMention}\n` +
-            (populatedActivity.clientId?.name ? `*Cliente:* ${populatedActivity.clientId.name}\n` : '') +
-            `*Vencimiento:* ${populatedActivity.dueDate ? new Date(populatedActivity.dueDate).toLocaleDateString() : 'Sin fecha'}\n` +
-            (populatedActivity.description ? `*Descripción:* ${populatedActivity.description}\n` : '') +
-            `━━━━━━━━━━━━━━━━━━━`;
+            `*📝 NUEVA TAREA CREADA*\n\n` +
+            `🎯 *TAREA:* ${populatedActivity.title}\n\n` +
+            `👤 *ENCARGADO:* ${populatedActivity.assignedTo?.name || 'Sin asignar'} ${encargadoMention}\n\n` +
+            (populatedActivity.clientId?.name ? `🏢 *CLIENTE:* ${populatedActivity.clientId.name}\n\n` : '') +
+            `📅 *VENCIMIENTO:* ${populatedActivity.dueDate ? new Date(populatedActivity.dueDate).toLocaleDateString() : 'Sin fecha'}\n\n` +
+            (populatedActivity.description ? `📝 *DESCRIPCIÓN:*\n${populatedActivity.description}\n` : '')
           await baileysSock.sendMessage(groupId, { text: msg, mentions: mentionedJids });
           console.log('✅ Notificación enviada al grupo de notificaciones GEMS (Baileys)');
           console.log(`[WhatsApp Mention] Motivo: ${mentionReason}`);
