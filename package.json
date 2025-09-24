@@ -17,6 +17,7 @@
     "puppeteer": "^24.22.2",
     "qrcode-terminal": "^0.12.0",
     "socket.io": "^4.8.1",
-    "whatsapp-web.js": "^1.34.1"
+  "whatsapp-web.js": "^1.34.1",
+  "@whiskeysockets/baileys": "^6.6.0"
   }
 }
