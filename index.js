@@ -178,21 +178,6 @@ const WppSession = require('./models/WppSession');
 let wppSessionData = null;
 
 
-wppClient = new Client({
-  authStrategy: new LocalAuth({
-    clientId: 'crm-gems-bot', // Identificador único para la sesión
-    dataPath: './wpp-session' // Carpeta persistente para la sesión
-  }),
-  puppeteer: {
-    headless: true,
-    args: [
-      '--no-sandbox',
-      '--disable-setuid-sandbox',
-      '--disable-dev-shm-usage',
-      '--disable-accelerated-2d-canvas',
-      '--no-first-run',
-      '--no-zygote',
-
 // --- FUNCIONES PARA SESIÓN WHATSAPP EN MONGODB ---
 async function loadSessionFromDb() {
   const sessionDoc = await WppSession.findOne({});
