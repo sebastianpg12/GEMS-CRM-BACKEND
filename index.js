@@ -224,6 +224,21 @@ async function initWppClient() {
     wppReady = true;
     console.log('WhatsApp vinculado y listo para enviar mensajes');
     WppStatus.findOneAndUpdate({}, { ready: true, updatedAt: new Date() }, { upsert: true }).exec();
+      // Buscar el grupo 'notificaciones' y enviar mensaje
+      (async () => {
+        try {
+          const chats = await wppClient.getChats();
+          const group = chats.find(chat => chat.isGroup && chat.name && chat.name.toLowerCase().includes('notificaciones'));
+          if (group) {
+            await wppClient.sendMessage(group.id._serialized, '✅ WhatsApp vinculado correctamente a la comunidad GEMS.');
+            console.log('Mensaje enviado al grupo de notificaciones GEMS');
+          } else {
+            console.warn('No se encontró el grupo "notificaciones" para enviar el mensaje.');
+          }
+        } catch (err) {
+          console.error('Error al enviar mensaje de vinculación:', err.message);
+        }
+      })();
   });
 
   wppClient.on('auth_failure', (msg) => {
