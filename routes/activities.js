@@ -64,19 +64,23 @@ router.post('/', async (req, res) => {
 
     console.log('📋 Populated activity:', populatedActivity);
 
-    // --- Enviar notificación a WhatsApp (avisos) ---
+    // --- Enviar notificación a WhatsApp (grupo notificaciones) ---
     try {
-      // Configura el groupId de la sección 'avisos' de tu comunidad
-      const groupId = process.env.WPP_AVISOS_GROUP_ID || '<AQUÍ_EL_ID_DEL_GRUPO>'; // Reemplaza por el ID real
-      // Mensaje personalizado
-      const msg = `📝 Nueva tarea creada:\nTítulo: ${populatedActivity.title}\nEncargado: ${populatedActivity.assignedTo?.name || 'Sin asignar'}\nCliente: ${populatedActivity.clientId?.name || ''}\nVencimiento: ${populatedActivity.dueDate ? new Date(populatedActivity.dueDate).toLocaleDateString() : 'Sin fecha'}\nDescripción: ${populatedActivity.description || ''}`;
-      // Llamada al endpoint centralizado
-      await fetch('https://gems-crm-backend.onrender.com/api/wpp-send', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ groupId, message: msg })
-      });
-      console.log('✅ Notificación enviada a WhatsApp avisos');
+      // Acceso al cliente WhatsApp y búsqueda de grupo 'notificaciones'
+      const wppClient = req.app.get('wppClient');
+      if (wppClient && req.app.get('wppReady')) {
+        const chats = await wppClient.getChats();
+        const group = chats.find(chat => chat.isGroup && chat.name && chat.name.toLowerCase().includes('notificaciones'));
+        if (group) {
+          const msg = `📝 Nueva tarea creada:\nTítulo: ${populatedActivity.title}\nEncargado: ${populatedActivity.assignedTo?.name || 'Sin asignar'}\nCliente: ${populatedActivity.clientId?.name || ''}\nVencimiento: ${populatedActivity.dueDate ? new Date(populatedActivity.dueDate).toLocaleDateString() : 'Sin fecha'}\nDescripción: ${populatedActivity.description || ''}`;
+          await wppClient.sendMessage(group.id._serialized, msg);
+          console.log('✅ Notificación enviada al grupo de notificaciones GEMS');
+        } else {
+          console.warn('No se encontró el grupo "notificaciones" para enviar el mensaje.');
+        }
+      } else {
+        console.warn('WhatsApp no está listo para enviar notificaciones.');
+      }
     } catch (wppErr) {
       console.error('❌ Error enviando notificación WhatsApp:', wppErr);
     }

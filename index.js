@@ -177,7 +177,6 @@ let wppClient = null;
 const WppSession = require('./models/WppSession');
 let wppSessionData = null;
 
-
 // --- FUNCIONES PARA SESIÓN WHATSAPP EN MONGODB ---
 async function loadSessionFromDb() {
   const sessionDoc = await WppSession.findOne({});
