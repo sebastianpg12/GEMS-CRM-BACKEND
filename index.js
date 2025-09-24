@@ -14,22 +14,7 @@ const corsOptions = {
 
 const app = express();
 const server = http.createServer(app);
-  wppClient = new Client({
-    session: wppSessionData,
-    puppeteer: {
-      headless: true,
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-accelerated-2d-canvas',
-        '--no-first-run',
-        '--no-zygote',
-        '--single-process',
-        '--disable-gpu'
-      ]
-    }
-  });
+// ...existing code...
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Create uploads/chat directory if it doesn't exist
