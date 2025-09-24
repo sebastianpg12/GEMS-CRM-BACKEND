@@ -83,23 +83,30 @@ router.post('/', async (req, res) => {
           // Mejorar la lógica de mención: validar, formatear y buscar el JID en los participantes del grupo
           let encargadoMention = '';
           let mentionedJids = [];
+          let mentionReason = '';
           if (populatedActivity.assignedTo && populatedActivity.assignedTo.phone) {
-            // Formatear el número para WhatsApp JID (internacional, sin '+')
             let phoneRaw = populatedActivity.assignedTo.phone.replace(/[^\d]/g, '');
-            // Si el número empieza por '0', quitarlo (caso Colombia y otros)
             if (phoneRaw.startsWith('0')) phoneRaw = phoneRaw.substring(1);
-            // Si el número tiene menos de 10 dígitos, no mencionar
             if (phoneRaw.length >= 10) {
               const jid = `${phoneRaw}@s.whatsapp.net`;
-              // Buscar si el JID está en los participantes del grupo
               const group = allGroups[groupId];
               const participants = group?.participants ? Object.keys(group.participants) : [];
+              console.log(`[WhatsApp Mention] JID generado: ${jid}`);
+              console.log(`[WhatsApp Mention] Participantes del grupo:`, participants);
               if (participants.includes(jid)) {
                 encargadoMention = `@${phoneRaw}`;
                 mentionedJids = [jid];
+                mentionReason = 'Mención realizada correctamente.';
+              } else {
+                mentionReason = `No se realizó la mención: el JID (${jid}) no está entre los participantes del grupo.`;
               }
+            } else {
+              mentionReason = `No se realizó la mención: el número (${phoneRaw}) tiene menos de 10 dígitos.`;
             }
+          } else {
+            mentionReason = 'No se realizó la mención: no hay teléfono asignado al encargado.';
           }
+          const msg =
           const msg =
             `📝 *Nueva tarea creada*\n` +
             `━━━━━━━━━━━━━━━━━━━\n` +
@@ -111,6 +118,7 @@ router.post('/', async (req, res) => {
             `━━━━━━━━━━━━━━━━━━━`;
           await baileysSock.sendMessage(groupId, { text: msg, mentions: mentionedJids });
           console.log('✅ Notificación enviada al grupo de notificaciones GEMS (Baileys)');
+          console.log(`[WhatsApp Mention] Motivo: ${mentionReason}`);
         } else {
           console.warn('No se encontró el grupo "notificaciones" para enviar el mensaje (Baileys).');
         }
