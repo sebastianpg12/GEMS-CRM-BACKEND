@@ -3,7 +3,7 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const http = require('http');
 const path = require('path');
-const io = require('socket.io')(server);
+// ...existing code...
 require('dotenv').config();
 // CORS sencillo: refleja el origin del request (permite todos los orígenes) y soporta credenciales
 const corsOptions = {
@@ -15,6 +15,7 @@ const corsOptions = {
 
 const app = express();
 const server = http.createServer(app);
+const io = require('socket.io')(server);
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Create uploads/chat directory if it doesn't exist
