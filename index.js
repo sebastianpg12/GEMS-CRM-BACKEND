@@ -231,16 +231,23 @@ async function initWppClient() {
     // Buscar el grupo 'notificaciones' y enviar mensaje
     (async () => {
       try {
-        const chats = await wppClient.getChats();
-        const group = chats.find(chat => chat.isGroup && chat.name && chat.name.toLowerCase().includes('notificaciones'));
+        let chats = await wppClient.getChats();
+        let group = chats.find(chat => chat.isGroup && chat.name && chat.name.toLowerCase().includes('notificaciones'));
+        if (!group) {
+          // Intentar recargar chats si no se encuentra el grupo
+          console.warn('[WPP] No se encontró el grupo "notificaciones". Intentando recargar chats...');
+          await new Promise(resolve => setTimeout(resolve, 2000));
+          chats = await wppClient.getChats();
+          group = chats.find(chat => chat.isGroup && chat.name && chat.name.toLowerCase().includes('notificaciones'));
+        }
         if (group) {
           await wppClient.sendMessage(group.id._serialized, '✅ WhatsApp vinculado correctamente a la comunidad GEMS.');
-          console.log('Mensaje enviado al grupo de notificaciones GEMS');
+          console.log('[WPP] Mensaje enviado al grupo de notificaciones GEMS');
         } else {
-          console.warn('No se encontró el grupo "notificaciones" para enviar el mensaje.');
+          console.warn('[WPP] No se encontró el grupo "notificaciones" para enviar el mensaje tras recarga. Requiere intervención manual.');
         }
       } catch (err) {
-        console.error('Error al enviar mensaje de vinculación:', err.message);
+        console.error('[WPP] Error al enviar mensaje de vinculación:', err.message);
       }
     })();
   });
