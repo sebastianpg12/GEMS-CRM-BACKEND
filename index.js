@@ -1,3 +1,6 @@
+  let reconnectAttempts = 0;
+  const MAX_RECONNECT_ATTEMPTS = 10;
+  const RECONNECT_DELAY = 15000; // 15 segundos
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
@@ -243,17 +246,51 @@ async function initWppClient() {
   });
 
   wppClient.on('auth_failure', (msg) => {
-  wppReady = false;
-  app.set('wppReady', false);
-  console.error('Error de autenticación WhatsApp:', msg);
-  WppStatus.findOneAndUpdate({}, { ready: false, updatedAt: new Date() }, { upsert: true }).exec();
+    wppReady = false;
+    app.set('wppReady', false);
+    reconnectAttempts++;
+    console.error(`[WPP] Error de autenticación WhatsApp: ${msg}`);
+    console.log(`[WPP] Intento de reconexión #${reconnectAttempts} (máx ${MAX_RECONNECT_ATTEMPTS})`);
+    WppStatus.findOneAndUpdate({}, { ready: false, updatedAt: new Date() }, { upsert: true }).exec();
+    if (reconnectAttempts <= MAX_RECONNECT_ATTEMPTS) {
+      setTimeout(() => {
+        console.log('[WPP] Reintentando inicializar WhatsApp Web Client tras auth_failure...');
+        try {
+          if (wppClient) {
+            wppClient.destroy();
+          }
+        } catch (e) {
+          console.error('[WPP] Error al destruir cliente previo:', e.message);
+        }
+        initWppClient();
+      }, RECONNECT_DELAY);
+    } else {
+      console.error('[WPP] Se alcanzó el máximo de reintentos de reconexión. Espera intervención manual.');
+    }
   });
 
   wppClient.on('disconnected', (reason) => {
-  wppReady = false;
-  app.set('wppReady', false);
-  console.warn('WhatsApp Web desconectado:', reason);
-  WppStatus.findOneAndUpdate({}, { ready: false, updatedAt: new Date() }, { upsert: true }).exec();
+    wppReady = false;
+    app.set('wppReady', false);
+    reconnectAttempts++;
+    console.warn(`[WPP] WhatsApp Web desconectado: ${reason}`);
+    console.log(`[WPP] Intento de reconexión #${reconnectAttempts} (máx ${MAX_RECONNECT_ATTEMPTS})`);
+    WppStatus.findOneAndUpdate({}, { ready: false, updatedAt: new Date() }, { upsert: true }).exec();
+    if (reconnectAttempts <= MAX_RECONNECT_ATTEMPTS) {
+      setTimeout(() => {
+        console.log('[WPP] Reintentando inicializar WhatsApp Web Client tras desconexión...');
+        try {
+          if (wppClient) {
+            wppClient.destroy();
+          }
+        } catch (e) {
+          console.error('[WPP] Error al destruir cliente previo:', e.message);
+        }
+        initWppClient();
+      }, RECONNECT_DELAY);
+    } else {
+      console.error('[WPP] Se alcanzó el máximo de reintentos de reconexión. Espera intervención manual.');
+    }
   });
 
   wppClient.on('authenticated', (session) => {
