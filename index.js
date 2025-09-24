@@ -1,17 +1,8 @@
-// Endpoint para listar todos los grupos disponibles en WhatsApp (Baileys)
-app.get('/api/wpp-groups', async (req, res) => {
-  if (!baileysReady) return res.status(503).json({ error: 'WhatsApp no vinculado' });
-  try {
-    const allGroups = await baileysSock.groupFetchAllParticipating();
-    const result = Object.values(allGroups).map(g => ({ name: g.subject, id: g.id }));
-    res.json(result);
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
-});
-  let reconnectAttempts = 0;
-  const MAX_RECONNECT_ATTEMPTS = 10;
-  const RECONNECT_DELAY = 15000; // 15 segundos
+let reconnectAttempts = 0;
+const MAX_RECONNECT_ATTEMPTS = 10;
+const RECONNECT_DELAY = 15000; // 15 segundos
+// ...existing code...
+// Place all app.get/app.post endpoint definitions below this line, after 'app' is initialized
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
