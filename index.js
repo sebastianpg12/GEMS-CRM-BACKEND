@@ -1,8 +1,6 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
-  try {
-    wppClient = new Client({
 const http = require('http');
 const socketIo = require('socket.io');
 require('dotenv').config();
@@ -16,31 +14,22 @@ const corsOptions = {
 
 const app = express();
 const server = http.createServer(app);
-
-// Apply CORS before JSON/static so uploads also get proper headers
-  } catch (err) {
-    console.error('Error inicializando WhatsApp Web Client:', err.message);
-    setTimeout(() => {
-      console.log('Reintentando inicializar WhatsApp Web Client...');
-      initWppClient();
-    }, 10000);
-    return;
-  }
-app.use(cors(corsOptions));
-app.use(express.json());
-
-// Socket.IO CORS: permitir cualquier origen (útil para desarrollo y apps SPA)
-const io = socketIo(server, {
-  cors: {
-    origin: '*',
-    methods: ['GET', 'POST'],
-    credentials: true,
-  }
-});
-
-let avisosGroupId = null; // Guardar el ID del grupo 'avisos' automáticamente
-
-// Servir archivos estáticos de uploads
+  wppClient = new Client({
+    session: wppSessionData,
+    puppeteer: {
+      headless: true,
+      args: [
+        '--no-sandbox',
+        '--disable-setuid-sandbox',
+        '--disable-dev-shm-usage',
+        '--disable-accelerated-2d-canvas',
+        '--no-first-run',
+        '--no-zygote',
+        '--single-process',
+        '--disable-gpu'
+      ]
+    }
+  });
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Create uploads/chat directory if it doesn't exist
