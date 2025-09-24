@@ -285,6 +285,17 @@ app.get('/api/wpp-status', async (req, res) => {
   }
 });
 
+// Endpoint para obtener el QR de WhatsApp
+app.get('/api/wpp-qr', (req, res) => {
+  if (qrCode && !wppReady) {
+    res.json({ qr: qrCode });
+  } else if (wppReady) {
+    res.json({ status: 'ready' });
+  } else {
+    res.status(503).json({ error: 'QR no disponible aún' });
+  }
+});
+
 const PORT = process.env.PORT || 4000;
 server.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
