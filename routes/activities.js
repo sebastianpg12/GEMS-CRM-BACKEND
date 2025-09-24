@@ -80,15 +80,25 @@ router.post('/', async (req, res) => {
           }
         }
         if (groupId) {
-          // Obtener el número de teléfono del encargado (formato internacional sin '+')
+          // Mejorar la lógica de mención: validar, formatear y buscar el JID en los participantes del grupo
           let encargadoMention = '';
           let mentionedJids = [];
           if (populatedActivity.assignedTo && populatedActivity.assignedTo.phone) {
-            // Formatear el número para WhatsApp JID
-            const phoneRaw = populatedActivity.assignedTo.phone.replace(/[^\d]/g, '');
-            const jid = `${phoneRaw}@s.whatsapp.net`;
-            encargadoMention = `@${phoneRaw}`;
-            mentionedJids = [jid];
+            // Formatear el número para WhatsApp JID (internacional, sin '+')
+            let phoneRaw = populatedActivity.assignedTo.phone.replace(/[^\d]/g, '');
+            // Si el número empieza por '0', quitarlo (caso Colombia y otros)
+            if (phoneRaw.startsWith('0')) phoneRaw = phoneRaw.substring(1);
+            // Si el número tiene menos de 10 dígitos, no mencionar
+            if (phoneRaw.length >= 10) {
+              const jid = `${phoneRaw}@s.whatsapp.net`;
+              // Buscar si el JID está en los participantes del grupo
+              const group = allGroups[groupId];
+              const participants = group?.participants ? Object.keys(group.participants) : [];
+              if (participants.includes(jid)) {
+                encargadoMention = `@${phoneRaw}`;
+                mentionedJids = [jid];
+              }
+            }
           }
           const msg =
             `📝 *Nueva tarea creada*\n` +
