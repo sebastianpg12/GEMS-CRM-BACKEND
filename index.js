@@ -2,6 +2,7 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const http = require('http');
+const path = require('path');
 const socketIo = require('socket.io');
 require('dotenv').config();
 // CORS sencillo: refleja el origin del request (permite todos los orígenes) y soporta credenciales
