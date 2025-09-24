@@ -92,13 +92,10 @@ router.post('/', async (req, res) => {
               const group = allGroups[groupId];
               // Log completo del objeto de participantes para inspección
               console.log('[WhatsApp Mention] group.participants:', JSON.stringify(group?.participants, null, 2));
-              const participants = group?.participants ? Object.keys(group.participants) : [];
+              // group.participants es un array, extraer los JID reales
+              const participants = group?.participants ? group.participants.map(p => p.jid) : [];
               // Mostrar mapping de JID a nombre para depuración
-              const participantMap = group?.participants ? group.participants : {};
-              const participantInfo = participants.map(jidKey => {
-                const info = participantMap[jidKey];
-                return `${jidKey} (${info?.name || info?.notify || 'Sin nombre'})`;
-              });
+              const participantInfo = group?.participants ? group.participants.map(p => `${p.jid} (admin: ${p.admin || 'no'})`) : [];
               console.log(`[WhatsApp Mention] JID generado: ${jid}`);
               console.log(`[WhatsApp Mention] Participantes del grupo:`, participantInfo);
               if (participants.includes(jid)) {
