@@ -1,9 +1,9 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
-const http = require('http');
 const path = require('path');
-// ...existing code...
+const http = require('http');
+const socketIo = require('socket.io');
 require('dotenv').config();
 // CORS sencillo: refleja el origin del request (permite todos los orígenes) y soporta credenciales
 const corsOptions = {
@@ -15,7 +15,23 @@ const corsOptions = {
 
 const app = express();
 const server = http.createServer(app);
-const io = require('socket.io')(server);
+
+// Apply CORS before JSON/static so uploads also get proper headers
+app.use(cors(corsOptions));
+app.use(express.json());
+
+// Socket.IO CORS: permitir cualquier origen (útil para desarrollo y apps SPA)
+const io = socketIo(server, {
+  cors: {
+    origin: '*',
+    methods: ['GET', 'POST'],
+    credentials: true,
+  }
+});
+
+let avisosGroupId = null; // Guardar el ID del grupo 'avisos' automáticamente
+
+// Servir archivos estáticos de uploads
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Create uploads/chat directory if it doesn't exist
@@ -32,51 +48,21 @@ app.set('io', io);
 // Importar rutas
 const authRoutes = require('./routes/auth');
 const clientsRoutes = require('./routes/clients');
-  wppClient.on('auth_failure', (msg) => {
-    wppReady = false;
-    app.set('wppReady', false);
-    console.error('Error de autenticación WhatsApp:', msg);
-    WppStatus.findOneAndUpdate({}, { ready: false, updatedAt: new Date() }, { upsert: true }).exec();
-    // Intentar reiniciar el cliente tras fallo de autenticación
-    setTimeout(() => {
-      console.log('Reiniciando WhatsApp Web Client tras auth_failure...');
-      try {
-        if (wppClient) {
-          wppClient.destroy();
-        }
-      } catch (e) {
-        console.error('Error al destruir cliente previo:', e.message);
-      }
-      initWppClient();
-    }, 10000);
-  });
+const activitiesRoutes = require('./routes/activities');
+const paymentsRoutes = require('./routes/payments');
+const accountingRoutes = require('./routes/accounting');
+const casesRoutes = require('./routes/cases');
+const followupsRoutes = require('./routes/followups');
 const issuesRoutes = require('./routes/issues');
-  wppClient.on('disconnected', (reason) => {
-    wppReady = false;
-    app.set('wppReady', false);
-    console.warn('WhatsApp Web desconectado:', reason);
-    WppStatus.findOneAndUpdate({}, { ready: false, updatedAt: new Date() }, { upsert: true }).exec();
-    // Intentar reiniciar el cliente tras desconexión
-    setTimeout(() => {
-      console.log('Reiniciando WhatsApp Web Client tras desconexión...');
-      try {
-        if (wppClient) {
-          wppClient.destroy();
-        }
-      } catch (e) {
-        console.error('Error al destruir cliente previo:', e.message);
-      }
-      initWppClient();
-    }, 10000);
-  });
+const notificationsRoutes = require('./routes/notifications');
+const docsRoutes = require('./routes/docs');
+
+const minutesRoutes = require('./routes/minutes');
+const settingsRoutes = require('./routes/settings');
 const teamRoutes = require('./routes/team');
 const reportsRoutes = require('./routes/reports');
-    try {
-      saveSessionToDb(session);
-      console.log('Sesión WhatsApp guardada en MongoDB');
-    } catch (err) {
-      console.error('Error guardando sesión WhatsApp:', err.message);
-    }
+
+const chatRoutes = require('./routes/chat');
 const prospectsRoutes = require('./routes/prospects');
 
 // Usar rutas
