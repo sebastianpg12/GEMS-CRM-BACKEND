@@ -58,9 +58,9 @@ router.post('/', async (req, res) => {
 
     // Poblar la actividad creada antes de enviarla
     const populatedActivity = await Activity.findById(activity._id)
-      .populate('clientId', 'name email company')
-      .populate('assignedTo', 'name email role photo')
-      .populate('createdBy', 'name email');
+  .populate('clientId', 'name email company')
+  .populate('assignedTo', 'name email role photo phone')
+  .populate('createdBy', 'name email');
 
     console.log('📋 Populated activity:', populatedActivity);
 
