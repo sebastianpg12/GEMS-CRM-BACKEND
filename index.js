@@ -171,151 +171,72 @@ io.on('connection', (socket) => {
   });
 });
 
-// --- INTEGRACIÓN WHATSAPP WEB ---
-const { Client, LocalAuth } = require('whatsapp-web.js');
-const WppStatus = require('./models/WppStatus');
-let qrCode = null;
-let wppReady = false;
-let wppClient = null;
-const WppSession = require('./models/WppSession');
-let wppSessionData = null;
+// --- INTEGRACIÓN WHATSAPP CON BAILEYS ---
+const { default: makeWASocket, useMultiFileAuthState, fetchLatestBaileysVersion } = require('@whiskeysockets/baileys');
+let baileysSock = null;
+let baileysReady = false;
+let baileysQR = null;
 
-// --- FUNCIONES PARA SESIÓN WHATSAPP EN MONGODB ---
-async function loadSessionFromDb() {
-  const sessionDoc = await WppSession.findOne({});
-  if (sessionDoc && sessionDoc.session && Object.keys(sessionDoc.session).length > 0) {
-    wppSessionData = sessionDoc.session;
-    console.log('Sesión WhatsApp restaurada desde MongoDB');
-  } else {
-    wppSessionData = null;
-    console.log('No hay sesión WhatsApp en MongoDB, se requiere escanear QR');
-  }
-}
+async function startBaileys() {
+  const { state, saveCreds } = await useMultiFileAuthState('baileys_auth');
+  const { version, isLatest } = await fetchLatestBaileysVersion();
+  baileysSock = makeWASocket({
+    version,
+    printQRInTerminal: true,
+    auth: state,
+    syncFullHistory: false,
+    defaultQueryTimeoutMs: 60000,
+  });
 
-function saveSessionToDb(session) {
-  WppSession.findOneAndUpdate({}, { session, updatedAt: new Date() }, { upsert: true }).exec();
-}
-
-async function initWppClient() {
-  await loadSessionFromDb();
-  wppClient = new Client({
-    session: wppSessionData,
-    puppeteer: {
-      headless: true,
-      args: [
-        '--no-sandbox',
-        '--disable-setuid-sandbox',
-        '--disable-dev-shm-usage',
-        '--disable-accelerated-2d-canvas',
-        '--no-first-run',
-        '--no-zygote',
-        '--single-process',
-        '--disable-gpu'
-      ]
+  baileysSock.ev.on('connection.update', async (update) => {
+    const { connection, lastDisconnect, qr } = update;
+    if (qr) {
+      baileysQR = qr;
+      console.log('[Baileys] Escanea este QR para vincular WhatsApp:', qr);
+    }
+    if (connection === 'open') {
+      baileysReady = true;
+      console.log('[Baileys] WhatsApp vinculado y listo para enviar mensajes');
+    }
+    if (connection === 'close') {
+      baileysReady = false;
+      console.warn('[Baileys] WhatsApp desconectado:', lastDisconnect?.error?.message);
+      setTimeout(() => startBaileys(), 15000);
     }
   });
 
-  wppClient.on('qr', (qr) => {
-    qrCode = qr;
-    wppReady = false;
-    console.log('QR actualizado para vincular WhatsApp Business');
-    WppStatus.findOneAndUpdate({}, { ready: false, updatedAt: new Date() }, { upsert: true }).exec();
-  });
-
-  wppClient.on('ready', () => {
-    wppReady = true;
-    app.set('wppClient', wppClient);
-    app.set('wppReady', true);
-    console.log('WhatsApp vinculado y listo para enviar mensajes');
-    WppStatus.findOneAndUpdate({}, { ready: true, updatedAt: new Date() }, { upsert: true }).exec();
-    // Buscar el grupo 'notificaciones' y enviar mensaje
-    (async () => {
-      try {
-        let chats = await wppClient.getChats();
-        let group = chats.find(chat => chat.isGroup && chat.name && chat.name.toLowerCase().includes('notificaciones'));
-        if (!group) {
-          // Intentar recargar chats si no se encuentra el grupo
-          console.warn('[WPP] No se encontró el grupo "notificaciones". Intentando recargar chats...');
-          await new Promise(resolve => setTimeout(resolve, 2000));
-          chats = await wppClient.getChats();
-          group = chats.find(chat => chat.isGroup && chat.name && chat.name.toLowerCase().includes('notificaciones'));
-        }
-        if (group) {
-          await wppClient.sendMessage(group.id._serialized, '✅ WhatsApp vinculado correctamente a la comunidad GEMS.');
-          console.log('[WPP] Mensaje enviado al grupo de notificaciones GEMS');
-        } else {
-          console.warn('[WPP] No se encontró el grupo "notificaciones" para enviar el mensaje tras recarga. Requiere intervención manual.');
-        }
-      } catch (err) {
-        console.error('[WPP] Error al enviar mensaje de vinculación:', err.message);
-      }
-    })();
-  });
-
-  wppClient.on('auth_failure', (msg) => {
-    wppReady = false;
-    app.set('wppReady', false);
-    reconnectAttempts++;
-    console.error(`[WPP] Error de autenticación WhatsApp: ${msg}`);
-    console.log(`[WPP] Intento de reconexión #${reconnectAttempts} (máx ${MAX_RECONNECT_ATTEMPTS})`);
-    WppStatus.findOneAndUpdate({}, { ready: false, updatedAt: new Date() }, { upsert: true }).exec();
-    if (reconnectAttempts <= MAX_RECONNECT_ATTEMPTS) {
-      setTimeout(() => {
-        console.log('[WPP] Reintentando inicializar WhatsApp Web Client tras auth_failure...');
-        try {
-          if (wppClient) {
-            wppClient.destroy();
-          }
-        } catch (e) {
-          console.error('[WPP] Error al destruir cliente previo:', e.message);
-        }
-        initWppClient();
-      }, RECONNECT_DELAY);
-    } else {
-      console.error('[WPP] Se alcanzó el máximo de reintentos de reconexión. Espera intervención manual.');
-    }
-  });
-
-  wppClient.on('disconnected', (reason) => {
-    wppReady = false;
-    app.set('wppReady', false);
-    reconnectAttempts++;
-    console.warn(`[WPP] WhatsApp Web desconectado: ${reason}`);
-    console.log(`[WPP] Intento de reconexión #${reconnectAttempts} (máx ${MAX_RECONNECT_ATTEMPTS})`);
-    WppStatus.findOneAndUpdate({}, { ready: false, updatedAt: new Date() }, { upsert: true }).exec();
-    if (reconnectAttempts <= MAX_RECONNECT_ATTEMPTS) {
-      setTimeout(() => {
-        console.log('[WPP] Reintentando inicializar WhatsApp Web Client tras desconexión...');
-        try {
-          if (wppClient) {
-            wppClient.destroy();
-          }
-        } catch (e) {
-          console.error('[WPP] Error al destruir cliente previo:', e.message);
-        }
-        initWppClient();
-      }, RECONNECT_DELAY);
-    } else {
-      console.error('[WPP] Se alcanzó el máximo de reintentos de reconexión. Espera intervención manual.');
-    }
-  });
-
-  wppClient.on('authenticated', (session) => {
-    saveSessionToDb(session);
-    console.log('Sesión WhatsApp guardada en MongoDB');
-  });
-
-  wppClient.initialize();
+  baileysSock.ev.on('creds.update', saveCreds);
 }
 
-// Inicializar WhatsApp Web Client con sesión en MongoDB
-initWppClient();
+startBaileys();
 app.post('/api/wpp-send', async (req, res) => {
-  if (!wppReady) return res.status(503).json({ error: 'WhatsApp no vinculado' });
-  const { message } = req.body;
-  if (!avisosGroupId) return res.status(404).json({ error: 'No se encontró el grupo "avisos" vinculado' });
+  if (!baileysReady) return res.status(503).json({ error: 'WhatsApp no vinculado' });
+  const { message, groupName } = req.body;
   try {
-    await wppClient.sendMessage(avisosGroupId, message);
+    // Buscar el grupo por nombre
+    const allGroups = await baileysSock.groupFetchAllParticipating();
+    let groupId = null;
+    if (groupName) {
+      for (const id in allGroups) {
+        const group = allGroups[id];
+        if (group.subject && group.subject.toLowerCase().includes(groupName.toLowerCase())) {
+          groupId = group.id;
+          break;
+        }
+      }
+    }
+    // Si no se especifica, buscar el grupo 'notificaciones'
+    if (!groupId) {
+      for (const id in allGroups) {
+        const group = allGroups[id];
+        if (group.subject && group.subject.toLowerCase().includes('notificaciones')) {
+          groupId = group.id;
+          break;
+        }
+      }
+    }
+    if (!groupId) return res.status(404).json({ error: 'No se encontró el grupo "notificaciones" vinculado' });
+    await baileysSock.sendMessage(groupId, { text: message });
     res.json({ sent: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -338,20 +259,15 @@ app.get('/api/wpp-groups', async (req, res) => {
 });
 
 // Endpoint para consultar el estado de la sesión de WhatsApp
-app.get('/api/wpp-status', async (req, res) => {
-  try {
-    const status = await WppStatus.findOne({});
-    res.json({ ready: !!(status && status.ready) });
-  } catch (err) {
-    res.status(500).json({ error: err.message });
-  }
+app.get('/api/wpp-status', (req, res) => {
+  res.json({ ready: !!baileysReady });
 });
 
 // Endpoint para obtener el QR de WhatsApp
 app.get('/api/wpp-qr', (req, res) => {
-  if (qrCode && !wppReady) {
-    res.json({ qr: qrCode });
-  } else if (wppReady) {
+  if (baileysQR && !baileysReady) {
+    res.json({ qr: baileysQR });
+  } else if (baileysReady) {
     res.json({ status: 'ready' });
   } else {
     res.status(503).json({ error: 'QR no disponible aún' });
