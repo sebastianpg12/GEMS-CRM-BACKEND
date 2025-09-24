@@ -91,15 +91,26 @@ router.post('/', async (req, res) => {
               const jid = `${phoneRaw}@s.whatsapp.net`;
               const group = allGroups[groupId];
               const participants = group?.participants ? Object.keys(group.participants) : [];
+              // Mostrar mapping de JID a nombre para depuración
+              const participantMap = group?.participants ? group.participants : {};
+              const participantInfo = participants.map(jidKey => {
+                const info = participantMap[jidKey];
+                return `${jidKey} (${info?.name || info?.notify || 'Sin nombre'})`;
+              });
               console.log(`[WhatsApp Mention] JID generado: ${jid}`);
-              console.log(`[WhatsApp Mention] Participantes del grupo:`, participants);
+              console.log(`[WhatsApp Mention] Participantes del grupo:`, participantInfo);
               if (participants.includes(jid)) {
                 encargadoMention = `@${phoneRaw}`;
                 mentionedJids = [jid];
                 mentionReason = 'Mención realizada correctamente.';
-              } else {
-                mentionReason = `No se realizó la mención: el JID (${jid}) no está entre los participantes del grupo.`;
               }
+              // Log para comparar el JID que intentamos mencionar y los integrantes del grupo
+              console.log('[WhatsApp Mention] Intentando mencionar:', jid);
+              console.log('[WhatsApp Mention] Integrantes del grupo:');
+              participantInfo.forEach(p => console.log('  -', p));
+            } else {
+              mentionReason = `No se realizó la mención: el JID (${jid}) no está entre los participantes del grupo.`;
+            }
             } else {
               mentionReason = `No se realizó la mención: el número (${phoneRaw}) tiene menos de 10 dígitos.`;
             }
