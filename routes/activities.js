@@ -108,9 +108,9 @@ router.post('/', async (req, res) => {
               console.log('[WhatsApp Mention] Intentando mencionar:', jid);
               console.log('[WhatsApp Mention] Integrantes del grupo:');
               participantInfo.forEach(p => console.log('  -', p));
-            } else {
-              mentionReason = `No se realizó la mención: el JID (${jid}) no está entre los participantes del grupo.`;
-            }
+              if (!participants.includes(jid)) {
+                mentionReason = `No se realizó la mención: el JID (${jid}) no está entre los participantes del grupo.`;
+              }
             } else {
               mentionReason = `No se realizó la mención: el número (${phoneRaw}) tiene menos de 10 dígitos.`;
             }
