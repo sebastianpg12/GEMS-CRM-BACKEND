@@ -107,7 +107,6 @@ router.post('/', async (req, res) => {
             mentionReason = 'No se realizó la mención: no hay teléfono asignado al encargado.';
           }
           const msg =
-          const msg =
             `📝 *Nueva tarea creada*\n` +
             `━━━━━━━━━━━━━━━━━━━\n` +
             `*Tarea:* ${populatedActivity.title}\n` +
