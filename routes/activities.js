@@ -64,25 +64,33 @@ router.post('/', async (req, res) => {
 
     console.log('📋 Populated activity:', populatedActivity);
 
-    // --- Enviar notificación a WhatsApp (grupo notificaciones) ---
+    // --- Enviar notificación a WhatsApp (grupo notificaciones) usando Baileys ---
     try {
-      // Acceso al cliente WhatsApp y búsqueda de grupo 'notificaciones'
-      const wppClient = req.app.get('wppClient');
-      if (wppClient && req.app.get('wppReady')) {
-        const chats = await wppClient.getChats();
-        const group = chats.find(chat => chat.isGroup && chat.name && chat.name.toLowerCase().includes('notificaciones'));
-        if (group) {
+      // Acceso al cliente Baileys y búsqueda de grupo 'notificaciones'
+      const baileysSock = req.app.get('baileysSock') || global.baileysSock;
+      const baileysReady = req.app.get('baileysReady') || global.baileysReady;
+      if (baileysSock && baileysReady) {
+        const allGroups = await baileysSock.groupFetchAllParticipating();
+        let groupId = null;
+        for (const id in allGroups) {
+          const group = allGroups[id];
+          if (group.subject && group.subject.toLowerCase().includes('notificaciones')) {
+            groupId = group.id;
+            break;
+          }
+        }
+        if (groupId) {
           const msg = `📝 Nueva tarea creada:\nTítulo: ${populatedActivity.title}\nEncargado: ${populatedActivity.assignedTo?.name || 'Sin asignar'}\nCliente: ${populatedActivity.clientId?.name || ''}\nVencimiento: ${populatedActivity.dueDate ? new Date(populatedActivity.dueDate).toLocaleDateString() : 'Sin fecha'}\nDescripción: ${populatedActivity.description || ''}`;
-          await wppClient.sendMessage(group.id._serialized, msg);
-          console.log('✅ Notificación enviada al grupo de notificaciones GEMS');
+          await baileysSock.sendMessage(groupId, { text: msg });
+          console.log('✅ Notificación enviada al grupo de notificaciones GEMS (Baileys)');
         } else {
-          console.warn('No se encontró el grupo "notificaciones" para enviar el mensaje.');
+          console.warn('No se encontró el grupo "notificaciones" para enviar el mensaje (Baileys).');
         }
       } else {
-        console.warn('WhatsApp no está listo para enviar notificaciones.');
+        console.warn('WhatsApp (Baileys) no está listo para enviar notificaciones.');
       }
     } catch (wppErr) {
-      console.error('❌ Error enviando notificación WhatsApp:', wppErr);
+      console.error('❌ Error enviando notificación WhatsApp (Baileys):', wppErr);
     }
 
     res.json(populatedActivity);

@@ -1,3 +1,14 @@
+// Endpoint para listar todos los grupos disponibles en WhatsApp (Baileys)
+app.get('/api/wpp-groups', async (req, res) => {
+  if (!baileysReady) return res.status(503).json({ error: 'WhatsApp no vinculado' });
+  try {
+    const allGroups = await baileysSock.groupFetchAllParticipating();
+    const result = Object.values(allGroups).map(g => ({ name: g.subject, id: g.id }));
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
   let reconnectAttempts = 0;
   const MAX_RECONNECT_ATTEMPTS = 10;
   const RECONNECT_DELAY = 15000; // 15 segundos
@@ -176,6 +187,8 @@ const { default: makeWASocket, useMultiFileAuthState, fetchLatestBaileysVersion 
 let baileysSock = null;
 let baileysReady = false;
 let baileysQR = null;
+app.set('baileysSock', null);
+app.set('baileysReady', false);
 
 async function startBaileys() {
   const { state, saveCreds } = await useMultiFileAuthState('baileys_auth');
@@ -187,6 +200,7 @@ async function startBaileys() {
     syncFullHistory: false,
     defaultQueryTimeoutMs: 60000,
   });
+  app.set('baileysSock', baileysSock);
 
   baileysSock.ev.on('connection.update', async (update) => {
     const { connection, lastDisconnect, qr } = update;
@@ -196,10 +210,12 @@ async function startBaileys() {
     }
     if (connection === 'open') {
       baileysReady = true;
+      app.set('baileysReady', true);
       console.log('[Baileys] WhatsApp vinculado y listo para enviar mensajes');
     }
     if (connection === 'close') {
       baileysReady = false;
+      app.set('baileysReady', false);
       console.warn('[Baileys] WhatsApp desconectado:', lastDisconnect?.error?.message);
       setTimeout(() => startBaileys(), 15000);
     }
