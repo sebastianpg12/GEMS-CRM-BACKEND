@@ -80,8 +80,26 @@ router.post('/', async (req, res) => {
           }
         }
         if (groupId) {
-          const msg = `📝 Nueva tarea creada:\nTítulo: ${populatedActivity.title}\nEncargado: ${populatedActivity.assignedTo?.name || 'Sin asignar'}\nCliente: ${populatedActivity.clientId?.name || ''}\nVencimiento: ${populatedActivity.dueDate ? new Date(populatedActivity.dueDate).toLocaleDateString() : 'Sin fecha'}\nDescripción: ${populatedActivity.description || ''}`;
-          await baileysSock.sendMessage(groupId, { text: msg });
+          // Obtener el número de teléfono del encargado (formato internacional sin '+')
+          let encargadoMention = '';
+          let mentionedJids = [];
+          if (populatedActivity.assignedTo && populatedActivity.assignedTo.phone) {
+            // Formatear el número para WhatsApp JID
+            const phoneRaw = populatedActivity.assignedTo.phone.replace(/[^\d]/g, '');
+            const jid = `${phoneRaw}@s.whatsapp.net`;
+            encargadoMention = `@${phoneRaw}`;
+            mentionedJids = [jid];
+          }
+          const msg =
+            `📝 *Nueva tarea creada*\n` +
+            `━━━━━━━━━━━━━━━━━━━\n` +
+            `*Tarea:* ${populatedActivity.title}\n` +
+            `*Encargado:* ${populatedActivity.assignedTo?.name || 'Sin asignar'} ${encargadoMention}\n` +
+            (populatedActivity.clientId?.name ? `*Cliente:* ${populatedActivity.clientId.name}\n` : '') +
+            `*Vencimiento:* ${populatedActivity.dueDate ? new Date(populatedActivity.dueDate).toLocaleDateString() : 'Sin fecha'}\n` +
+            (populatedActivity.description ? `*Descripción:* ${populatedActivity.description}\n` : '') +
+            `━━━━━━━━━━━━━━━━━━━`;
+          await baileysSock.sendMessage(groupId, { text: msg, mentions: mentionedJids });
           console.log('✅ Notificación enviada al grupo de notificaciones GEMS (Baileys)');
         } else {
           console.warn('No se encontró el grupo "notificaciones" para enviar el mensaje (Baileys).');
