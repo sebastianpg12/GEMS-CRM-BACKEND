@@ -1,3 +1,21 @@
+// Obtener actividades pendientes asignadas al usuario logueado
+router.get('/mine', async (req, res) => {
+  try {
+    // El ID del usuario logueado debe estar en req.user._id (middleware de autenticación)
+    const userId = req.user?._id || req.user?.id;
+    if (!userId) {
+      return res.status(401).json({ error: 'No autenticado' });
+    }
+    const activities = await Activity.find({ assignedTo: userId, status: 'pending' })
+      .populate('clientId', 'name email company')
+      .populate('assignedTo', 'name email role photo')
+      .populate('createdBy', 'name email')
+      .sort({ dueDate: 1 });
+    res.json(activities);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
 const express = require('express');
 const router = express.Router();
 const Activity = require('../models/Activity');
