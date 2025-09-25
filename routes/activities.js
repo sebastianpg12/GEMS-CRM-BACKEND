@@ -1,3 +1,9 @@
+
+const express = require('express');
+const router = express.Router();
+const Activity = require('../models/Activity');
+const User = require('../models/User');
+
 // Obtener actividades pendientes asignadas al usuario logueado
 router.get('/mine', async (req, res) => {
   try {
@@ -16,10 +22,6 @@ router.get('/mine', async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 });
-const express = require('express');
-const router = express.Router();
-const Activity = require('../models/Activity');
-const User = require('../models/User');
 
 // Obtener todas las actividades
 router.get('/', async (req, res) => {
