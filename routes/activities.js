@@ -52,12 +52,13 @@ router.get('/', async (req, res) => {
 // Obtener actividades asignadas a un usuario específico
 router.get('/assigned/:userId', async (req, res) => {
   try {
+    console.log('[API] Buscando actividades para assignedTo:', req.params.userId);
     const activities = await Activity.find({ assignedTo: req.params.userId })
       .populate('clientId', 'name email company')
       .populate('assignedTo', 'name email role photo')
       .populate('createdBy', 'name email')
       .sort({ dueDate: 1 });
-    
+    console.log('[API] Actividades encontradas:', activities);
     res.json(activities);
   } catch (error) {
     res.status(500).json({ error: error.message });
