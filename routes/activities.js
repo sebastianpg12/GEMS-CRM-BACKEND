@@ -133,18 +133,6 @@ router.get('/assigned/:userId', async (req, res) => {
     }
 
     res.json(populatedActivity);
-          console.log(`[WhatsApp Mention] Motivo: ${mentionReason}`);
-        } else {
-          console.warn('No se encontró el grupo "notificaciones" para enviar el mensaje (Baileys).');
-        }
-      } else {
-        console.warn('WhatsApp (Baileys) no está listo para enviar notificaciones.');
-      }
-    } catch (wppErr) {
-      console.error('❌ Error enviando notificación WhatsApp (Baileys):', wppErr);
-    }
-
-    res.json(populatedActivity);
   } catch (error) {
     console.error('❌ Error creating activity:', error);
     res.status(400).json({ error: error.message });
