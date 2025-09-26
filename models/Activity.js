@@ -10,7 +10,7 @@ const ActivitySchema = new mongoose.Schema({
     default: 'pending' 
   },
   clientId: { type: mongoose.Schema.Types.ObjectId, ref: 'Client' },
-  assignedTo: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }, // Referencia al miembro del equipo
+  assignedTo: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }], // Referencia a múltiples miembros del equipo
   priority: { 
     type: String, 
     enum: ['low', 'medium', 'high', 'urgent'], 
