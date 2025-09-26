@@ -1,3 +1,18 @@
+// Crear nueva actividad
+router.post('/', async (req, res) => {
+  try {
+    const activity = new Activity(req.body);
+    await activity.save();
+    // Poblar la actividad creada antes de enviarla
+    const populatedActivity = await Activity.findById(activity._id)
+      .populate('clientId', 'name email company')
+      .populate('assignedTo', 'name email role photo phone')
+      .populate('createdBy', 'name email');
+    res.json(populatedActivity);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
 
 const express = require('express');
 const router = express.Router();
