@@ -1,7 +1,3 @@
-const express = require('express');
-const router = express.Router();
-const Activity = require('../models/Activity');
-const User = require('../models/User');
 
 // Crear nueva actividad
 router.post('/', async (req, res) => {
@@ -18,11 +14,6 @@ router.post('/', async (req, res) => {
     res.status(400).json({ error: error.message });
   }
 });
-
-const express = require('express');
-const router = express.Router();
-const Activity = require('../models/Activity');
-const User = require('../models/User');
 
 // Obtener actividades pendientes asignadas al usuario logueado
 router.get('/mine', async (req, res) => {
