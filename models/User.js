@@ -169,6 +169,7 @@ userSchema.pre('save', function(next) {
 userSchema.methods.toJSON = function() {
   const user = this.toObject();
   delete user.password;
+  // Don't force default avatar here - let frontend handle defaults
   return user;
 };
 
