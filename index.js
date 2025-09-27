@@ -23,7 +23,6 @@ const server = http.createServer(app);
 
 // Apply CORS before JSON/static so uploads also get proper headers
 app.use(cors(corsOptions));
-app.use(express.json());
 
 // Socket.IO CORS: permitir cualquier origen (útil para desarrollo y apps SPA)
 const io = socketIo(server, {
