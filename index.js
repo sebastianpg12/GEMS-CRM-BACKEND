@@ -36,8 +36,15 @@ const io = socketIo(server, {
 
 let avisosGroupId = null; // Guardar el ID del grupo 'avisos' automáticamente
 
-// Servir archivos estáticos de uploads
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+// Servir archivos estáticos de uploads con headers CORS
+app.use('/uploads', express.static(path.join(__dirname, 'uploads'), {
+  setHeaders: (res, path) => {
+    res.set('Access-Control-Allow-Origin', '*');
+    res.set('Access-Control-Allow-Methods', 'GET');
+    res.set('Access-Control-Allow-Headers', 'Content-Type');
+    res.set('Cache-Control', 'public, max-age=31536000'); // Cache por 1 año
+  }
+}));
 
 // Create uploads/chat directory if it doesn't exist
 const fs = require('fs');
