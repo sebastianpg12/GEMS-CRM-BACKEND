@@ -3,6 +3,28 @@ const router = express.Router();
 const Activity = require('../models/Activity');
 const User = require('../models/User');
 
+// Funciones helper para formatear texto en WhatsApp
+const getPriorityText = (priority) => {
+  const priorities = {
+    'low': '🟢 Baja',
+    'medium': '🟡 Media',
+    'high': '🟠 Alta',
+    'urgent': '🔴 Urgente'
+  };
+  return priorities[priority] || '🟡 Media';
+};
+
+const getStatusText = (status) => {
+  const statuses = {
+    'pending': '⏳ Pendiente',
+    'in-progress': '🔄 En Progreso',
+    'completed': '✅ Completada',
+    'overdue': '⚠️ Vencida',
+    'cancelled': '❌ Cancelada'
+  };
+  return statuses[status] || '⏳ Pendiente';
+};
+
 // Crear nueva actividad
 router.post('/', async (req, res) => {
   console.log('🚀 [ACTIVITIES] Iniciando creación de nueva actividad');
@@ -56,15 +78,19 @@ router.post('/', async (req, res) => {
         if (groupId) {
           console.log('📝 [WHATSAPP] Preparando mensaje para grupo:', groupId);
 
-          // Mencionar a todos los asignados
-          let encargadoMention = '';
+          // Preparar lista de asignados con menciones individuales
+          let assignedList = '';
           let mentionedJids = [];
           let mentionReason = '';
 
-          if (Array.isArray(populatedActivity.assignedTo)) {
+          if (Array.isArray(populatedActivity.assignedTo) && populatedActivity.assignedTo.length > 0) {
             console.log('👥 [WHATSAPP] Procesando usuarios asignados:', populatedActivity.assignedTo.length);
+
             populatedActivity.assignedTo.forEach(user => {
               console.log('👤 [WHATSAPP] Procesando usuario:', user.name, 'Phone:', user.phone);
+
+              assignedList += `• ${user.name}`;
+
               if (user && user.phone) {
                 let phoneRaw = user.phone.replace(/[^\d]/g, '');
                 if (phoneRaw.startsWith('0')) phoneRaw = phoneRaw.substring(1);
@@ -74,10 +100,9 @@ router.post('/', async (req, res) => {
 
                   const group = allGroups[groupId];
                   const participants = group?.participants ? group.participants.map(p => p.jid) : [];
-                  console.log('👥 [WHATSAPP] Participantes del grupo:', participants.length);
 
                   if (participants.includes(jid)) {
-                    encargadoMention += `@${phoneRaw} `;
+                    assignedList += ` @${phoneRaw}`;
                     mentionedJids.push(jid);
                     console.log('✅ [WHATSAPP] Usuario agregado a menciones:', user.name);
                   } else {
@@ -89,21 +114,28 @@ router.post('/', async (req, res) => {
               } else {
                 console.log('❌ [WHATSAPP] Usuario sin teléfono:', user?.name);
               }
+
+              assignedList += '\\n';
             });
 
             mentionReason = mentionedJids.length > 0 ? 'Mención realizada correctamente.' : 'No se realizó la mención: ningún JID válido.';
           } else {
+            assignedList = 'Sin asignar';
             mentionReason = 'No se realizó la mención: no hay usuarios asignados.';
             console.log('❌ [WHATSAPP] No hay usuarios asignados');
           }
 
           const msg =
             `*\ud83d\udcdd NUEVA TAREA CREADA*\\n\\n` +
-            `\ud83c\udfaf *TAREA:* ${populatedActivity.title}\\n\\n` +
-            `\ud83d\udc64 *ENCARGADOS:* ${populatedActivity.assignedTo?.map(u => u.name).join(', ') || 'Sin asignar'} ${encargadoMention}\\n\\n` +
-            (populatedActivity.clientId?.name ? `\ud83c\udfe2 *CLIENTE:* ${populatedActivity.clientId.name}\\n\\n` : '') +
-            `\ud83d\udcc5 *VENCIMIENTO:* ${populatedActivity.dueDate ? new Date(populatedActivity.dueDate).toLocaleDateString() : 'Sin fecha'}\\n\\n` +
-            (populatedActivity.description ? `\ud83d\udcdd *DESCRIPCIÓN:*\\n${populatedActivity.description}\\n` : '');
+            `\ud83c\udfaf *Título:* ${populatedActivity.title}\\n` +
+            `\ud83d\udcdd *Descripción:* ${populatedActivity.description || 'Sin descripción'}\\n\\n` +
+            `\ud83d\udc64 *Asignado a:*\\n${assignedList}\\n` +
+            (populatedActivity.clientId?.name ? `\ud83c\udfe2 *Cliente:* ${populatedActivity.clientId.name}\\n` : '') +
+            `\ud83d\udcc5 *Fecha límite:* ${populatedActivity.dueDate ? new Date(populatedActivity.dueDate).toLocaleDateString('es-ES') : 'Sin fecha límite'}\\n` +
+            `\u23f1\ufe0f *Tiempo estimado:* ${populatedActivity.estimatedTime || 'No especificado'}\\n` +
+            `\ud83c\udf9b\ufe0f *Prioridad:* ${getPriorityText(populatedActivity.priority)}\\n` +
+            `\ud83d\udd04 *Estado:* ${getStatusText(populatedActivity.status)}\\n\\n` +
+            `\ud83d\udce2 _Esta tarea ha sido creada en el sistema GEMS CRM_`;
 
           console.log('📤 [WHATSAPP] Enviando mensaje...');
           console.log('💬 [WHATSAPP] Mensaje:', msg);
