@@ -261,13 +261,11 @@ app.post('/api/wpp-send', async (req, res) => {
 
 // Endpoint para listar grupos/chats de WhatsApp (solo para uso interno)
 app.get('/api/wpp-groups', async (req, res) => {
-  if (!wppReady) return res.status(503).json({ error: 'WhatsApp no vinculado' });
+  if (!baileysReady) return res.status(503).json({ error: 'WhatsApp no vinculado' });
   try {
-    const chats = await wppClient.getChats();
-    // Filtrar solo grupos
-    const groups = chats.filter(chat => chat.isGroup);
+    const allGroups = await baileysSock.groupFetchAllParticipating();
     // Mapear nombre e ID
-    const result = groups.map(g => ({ name: g.name, id: g.id._serialized }));
+    const result = Object.values(allGroups).map(g => ({ name: g.subject, id: g.id }));
     res.json(result);
   } catch (err) {
     res.status(500).json({ error: err.message });
