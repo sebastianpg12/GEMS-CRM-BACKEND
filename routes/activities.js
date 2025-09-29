@@ -115,7 +115,7 @@ router.post('/', async (req, res) => {
                 console.log('❌ [WHATSAPP] Usuario sin teléfono:', user?.name);
               }
 
-              assignedList += '\\n';
+              assignedList += '\n';
             });
 
             mentionReason = mentionedJids.length > 0 ? 'Mención realizada correctamente.' : 'No se realizó la mención: ningún JID válido.';
@@ -126,16 +126,15 @@ router.post('/', async (req, res) => {
           }
 
           const msg =
-            `*\ud83d\udcdd NUEVA TAREA CREADA*\\n\\n` +
-            `\ud83c\udfaf *Título:* ${populatedActivity.title}\\n` +
-            `\ud83d\udcdd *Descripción:* ${populatedActivity.description || 'Sin descripción'}\\n\\n` +
-            `\ud83d\udc64 *Asignado a:*\\n${assignedList}` +
-            (populatedActivity.clientId?.name ? `\\n\ud83c\udfe2 *Cliente:* ${populatedActivity.clientId.name}\\n` : '\\n') +
-            `\ud83d\udcc5 *Fecha límite:* ${populatedActivity.dueDate ? new Date(populatedActivity.dueDate).toLocaleDateString('es-ES') : 'Sin fecha límite'}\\n` +
-            `\u23f1\ufe0f *Tiempo estimado:* ${populatedActivity.estimatedTime || 'No especificado'}\\n` +
-            `\ud83c\udf9b\ufe0f *Prioridad:* ${getPriorityText(populatedActivity.priority)}\\n` +
-            `\ud83d\udd04 *Estado:* ${getStatusText(populatedActivity.status)}\\n\\n` +
-            `\ud83d\udce2 _Esta tarea ha sido creada en el sistema GEMS CRM_`;
+            `*\ud83d\udcdd NUEVA TAREA CREADA*\n\n` +
+            `\ud83c\udfaf *Título:* ${populatedActivity.title}\n` +
+            `\ud83d\udcdd *Descripción:* ${populatedActivity.description || 'Sin descripción'}\n\n` +
+            `\ud83d\udc64 *Asignado a:*\n${assignedList}` +
+            (populatedActivity.clientId?.name ? `\n\ud83c\udfe2 *Cliente:* ${populatedActivity.clientId.name}\n` : '\n') +
+            `\ud83d\udcc5 *Fecha límite:* ${populatedActivity.dueDate ? new Date(populatedActivity.dueDate).toLocaleDateString('es-ES') : 'Sin fecha límite'}\n` +
+            `\u23f1\ufe0f *Tiempo estimado:* ${populatedActivity.estimatedTime || 'No especificado'}\n` +
+            `\ud83c\udf9b\ufe0f *Prioridad:* ${getPriorityText(populatedActivity.priority)}\n` +
+            `\ud83d\udd04 *Estado:* ${getStatusText(populatedActivity.status)}\n\n`;
 
           console.log('📤 [WHATSAPP] Enviando mensaje...');
           console.log('💬 [WHATSAPP] Mensaje:', msg);
