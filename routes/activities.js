@@ -129,8 +129,8 @@ router.post('/', async (req, res) => {
             `*\ud83d\udcdd NUEVA TAREA CREADA*\\n\\n` +
             `\ud83c\udfaf *Título:* ${populatedActivity.title}\\n` +
             `\ud83d\udcdd *Descripción:* ${populatedActivity.description || 'Sin descripción'}\\n\\n` +
-            `\ud83d\udc64 *Asignado a:*\\n${assignedList}\\n` +
-            (populatedActivity.clientId?.name ? `\ud83c\udfe2 *Cliente:* ${populatedActivity.clientId.name}\\n` : '') +
+            `\ud83d\udc64 *Asignado a:*\\n${assignedList}` +
+            (populatedActivity.clientId?.name ? `\\n\ud83c\udfe2 *Cliente:* ${populatedActivity.clientId.name}\\n` : '\\n') +
             `\ud83d\udcc5 *Fecha límite:* ${populatedActivity.dueDate ? new Date(populatedActivity.dueDate).toLocaleDateString('es-ES') : 'Sin fecha límite'}\\n` +
             `\u23f1\ufe0f *Tiempo estimado:* ${populatedActivity.estimatedTime || 'No especificado'}\\n` +
             `\ud83c\udf9b\ufe0f *Prioridad:* ${getPriorityText(populatedActivity.priority)}\\n` +
