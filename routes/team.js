@@ -46,6 +46,8 @@ router.get('/', checkTeamPermissions('view'), async (req, res) => {
         name: user.name,
         email: user.email,
         role: user.role,
+        avatar: user.avatar,
+        photo: user.photo,
         department: user.department,
         position: user.position,
         phone: user.phone,
