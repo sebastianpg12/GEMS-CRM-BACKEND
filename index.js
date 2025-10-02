@@ -77,6 +77,7 @@ const reportsRoutes = require('./routes/reports');
 const chatRoutes = require('./routes/chat');
 const prospectsRoutes = require('./routes/prospects');
 const avatarRoutes = require('./routes/avatars');
+const taskReportsRoutes = require('./routes/taskReports');
 
 // Usar rutas
 app.use('/api/auth', authRoutes);
@@ -96,6 +97,7 @@ app.use('/api/reports', reportsRoutes);
 app.use('/api/chat', chatRoutes);
 app.use('/api/prospects', prospectsRoutes);
 app.use('/api/avatars', avatarRoutes);
+app.use('/api/task-reports', taskReportsRoutes);
 
 // Conexión a MongoDB usando .env
 mongoose.connect(process.env.MONGO_URI, {
@@ -107,6 +109,10 @@ const db = mongoose.connection;
 db.on('error', console.error.bind(console, 'MongoDB connection error:'));
 db.once('open', () => {
   console.log('Connected to MongoDB');
+  
+  // Inicializar el servicio de cron para reportes de tareas
+  const { initTaskReportsCron } = require('./services/cronService');
+  initTaskReportsCron(app);
 });
 
 // Socket.io connection handling

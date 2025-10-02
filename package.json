@@ -14,10 +14,11 @@
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^7.0.3",
     "multer": "^2.0.2",
+    "node-cron": "^3.0.3",
     "puppeteer": "^24.22.2",
     "qrcode-terminal": "^0.12.0",
     "socket.io": "^4.8.1",
-  "whatsapp-web.js": "^1.34.1",
-  "@whiskeysockets/baileys": "^6.6.0"
+    "whatsapp-web.js": "^1.34.1",
+    "@whiskeysockets/baileys": "^6.6.0"
   }
 }
