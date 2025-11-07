@@ -25,7 +25,11 @@ router.get('/', async (req, res) => {
     
     let filter = {};
     
-    if (board) filter.boardId = board;
+    // Solo filtrar por board si se proporciona
+    if (board) {
+      filter.boardId = board;
+    }
+    
     if (boardStatus) filter.boardStatus = boardStatus;
     if (status) filter.status = status;
     if (priority) filter.priority = priority;

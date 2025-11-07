@@ -57,7 +57,7 @@ const TaskSchema = new mongoose.Schema({
   boardId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Board',
-    required: true
+    default: null
   },
   
   // Relaciones
