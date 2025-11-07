@@ -1,18 +1,28 @@
 const User = require('../models/User');
+const fs = require('fs');
+const path = require('path');
 
 /**
- * Servicio para gestión de avatares de usuario
+ * Servicio para gestión de avatares y fotos de perfil de usuario
  */
 class AvatarService {
   /**
    * Obtiene el avatar actual del usuario
    * @param {string} userId - ID del usuario
-   * @returns {Promise<string|null>} Avatar del usuario o null si no tiene
+   * @returns {Promise<Object>} Información de avatar del usuario
    */
   static async getUserAvatar(userId) {
     try {
-      const user = await User.findById(userId).select('avatar');
-      return user ? user.avatar : null;
+      const user = await User.findById(userId).select('avatar photo');
+      
+      // Si no existe el usuario, devolver null
+      if (!user) return null;
+      
+      // Devolver tanto el avatar predefinido como la foto personalizada
+      return {
+        avatar: user.avatar,
+        photo: user.photo
+      };
     } catch (error) {
       console.error('Error getting user avatar:', error);
       throw new Error('Error obteniendo avatar del usuario');
@@ -32,9 +42,15 @@ class AvatarService {
         throw new Error('ID de avatar inválido');
       }
 
+      // Si se establece un avatar predefinido, quitar la foto personalizada
+      const updateData = { 
+        avatar: avatarId,
+        photo: null // Remover foto cuando se selecciona avatar
+      };
+
       const updatedUser = await User.findByIdAndUpdate(
         userId,
-        { avatar: avatarId }, // Permite null/undefined
+        updateData,
         { new: true, runValidators: true }
       ).select('-password');
 
@@ -45,6 +61,54 @@ class AvatarService {
       return updatedUser;
     } catch (error) {
       console.error('Error updating user avatar:', error);
+      throw error;
+    }
+  }
+  
+  /**
+   * Actualiza la foto de perfil personalizada del usuario
+   * @param {string} userId - ID del usuario
+   * @param {string} photoPath - Ruta del archivo de foto
+   * @returns {Promise<Object>} Usuario actualizado
+   */
+  static async updateUserPhoto(userId, photoPath) {
+    try {
+      // Obtener datos actuales del usuario para eliminar foto antigua si existe
+      const currentUser = await User.findById(userId).select('photo');
+      
+      if (!currentUser) {
+        throw new Error('Usuario no encontrado');
+      }
+      
+      // Si el usuario ya tenía una foto, intentar eliminarla
+      if (currentUser.photo) {
+        try {
+          const oldPhotoPath = path.join(__dirname, '..', currentUser.photo);
+          if (fs.existsSync(oldPhotoPath)) {
+            fs.unlinkSync(oldPhotoPath);
+          }
+        } catch (err) {
+          console.warn('No se pudo eliminar la foto antigua:', err);
+          // No lanzamos error para continuar con la actualización
+        }
+      }
+
+      const updatedUser = await User.findByIdAndUpdate(
+        userId,
+        { 
+          photo: photoPath,
+          avatar: null // Si se sube foto, quitar el avatar predefinido
+        },
+        { new: true, runValidators: true }
+      ).select('-password');
+
+      if (!updatedUser) {
+        throw new Error('Usuario no encontrado');
+      }
+
+      return updatedUser;
+    } catch (error) {
+      console.error('Error updating user photo:', error);
       throw error;
     }
   }

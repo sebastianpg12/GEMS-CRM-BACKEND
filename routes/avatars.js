@@ -1,6 +1,10 @@
 const express = require('express');
 const AvatarService = require('../services/avatarService');
 const { authenticateToken } = require('../middleware/auth');
+const { uploadProfilePhoto } = require('../middleware/upload');
+const path = require('path');
+const fs = require('fs');
+const User = require('../models/User');
 
 const router = express.Router();
 
@@ -66,12 +70,13 @@ router.get('/stats', authenticateToken, async (req, res) => {
  */
 router.get('/user', authenticateToken, async (req, res) => {
   try {
-    const avatar = await AvatarService.getUserAvatar(req.user._id);
+    const avatarInfo = await AvatarService.getUserAvatar(req.user._id);
 
     res.json({
       success: true,
       data: {
-        avatar: avatar,
+        avatar: avatarInfo?.avatar,
+        photo: avatarInfo?.photo,
         default: AvatarService.getDefaultAvatar()
       }
     });
@@ -157,6 +162,106 @@ router.delete('/user', authenticateToken, async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error removiendo avatar'
+    });
+  }
+});
+
+/**
+ * @route POST /api/avatars/upload-photo
+ * @desc Subir una foto de perfil personalizada
+ * @access Private
+ */
+router.post('/upload-photo', authenticateToken, uploadProfilePhoto.single('photo'), async (req, res) => {
+  try {
+    // Verificar si se subió un archivo
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: 'No se proporcionó ninguna imagen'
+      });
+    }
+
+    // Ruta relativa para guardar en la BD (sin el path base del proyecto)
+    const relativePath = path.join('/uploads/profiles', req.file.filename);
+
+    // Actualizar el usuario con la nueva foto
+    const updatedUser = await AvatarService.updateUserPhoto(req.user._id, relativePath);
+
+    res.json({
+      success: true,
+      message: 'Foto de perfil actualizada exitosamente',
+      data: {
+        user: updatedUser.toJSON(),
+        photo: relativePath
+      }
+    });
+  } catch (error) {
+    console.error('Error uploading profile photo:', error);
+
+    // Manejar diferentes tipos de errores
+    if (error.message.includes('límite de archivo')) {
+      return res.status(400).json({
+        success: false,
+        message: 'La imagen es demasiado grande. Máximo 2MB.'
+      });
+    }
+
+    if (error.message === 'Usuario no encontrado') {
+      return res.status(404).json({
+        success: false,
+        message: error.message
+      });
+    }
+
+    res.status(500).json({
+      success: false,
+      message: 'Error actualizando foto de perfil'
+    });
+  }
+});
+
+/**
+ * @route DELETE /api/avatars/photo
+ * @desc Eliminar la foto de perfil personalizada del usuario
+ * @access Private
+ */
+router.delete('/photo', authenticateToken, async (req, res) => {
+  try {
+    // Obtener usuario actual
+    const user = await User.findById(req.user._id).select('photo');
+    
+    // Si tiene foto, intentar eliminarla físicamente
+    if (user.photo) {
+      try {
+        const photoPath = path.join(__dirname, '..', user.photo);
+        if (fs.existsSync(photoPath)) {
+          fs.unlinkSync(photoPath);
+        }
+      } catch (err) {
+        console.warn('No se pudo eliminar el archivo de foto:', err);
+        // Continuar con la actualización aunque no se pueda borrar el archivo
+      }
+    }
+
+    // Actualizar el usuario para quitar la referencia a la foto
+    const updatedUser = await User.findByIdAndUpdate(
+      req.user._id,
+      { photo: null },
+      { new: true }
+    ).select('-password');
+
+    res.json({
+      success: true,
+      message: 'Foto de perfil eliminada exitosamente',
+      data: {
+        user: updatedUser.toJSON()
+      }
+    });
+  } catch (error) {
+    console.error('Error removing profile photo:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error eliminando la foto de perfil'
     });
   }
 });

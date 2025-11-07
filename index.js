@@ -78,6 +78,9 @@ const chatRoutes = require('./routes/chat');
 const prospectsRoutes = require('./routes/prospects');
 const avatarRoutes = require('./routes/avatars');
 const taskReportsRoutes = require('./routes/taskReports');
+const tasksRoutes = require('./routes/tasks');
+const boardsRoutes = require('./routes/boards');
+const githubRoutes = require('./routes/github');
 
 // Usar rutas
 app.use('/api/auth', authRoutes);
@@ -98,6 +101,9 @@ app.use('/api/chat', chatRoutes);
 app.use('/api/prospects', prospectsRoutes);
 app.use('/api/avatars', avatarRoutes);
 app.use('/api/task-reports', taskReportsRoutes);
+app.use('/api/tasks', tasksRoutes);
+app.use('/api/boards', boardsRoutes);
+app.use('/api/github', githubRoutes);
 
 // Conexión a MongoDB usando .env
 mongoose.connect(process.env.MONGO_URI, {
