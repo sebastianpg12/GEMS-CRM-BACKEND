@@ -19,11 +19,13 @@ router.get('/', async (req, res) => {
       assignedTo, 
       sprint,
       type,
-      tags
+      tags,
+      board
     } = req.query;
     
     let filter = {};
     
+    if (board) filter.boardId = board;
     if (boardStatus) filter.boardStatus = boardStatus;
     if (status) filter.status = status;
     if (priority) filter.priority = priority;

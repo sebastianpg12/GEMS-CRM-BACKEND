@@ -53,6 +53,13 @@ const TaskSchema = new mongoose.Schema({
     required: true
   },
   
+  // Tablero al que pertenece
+  boardId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Board',
+    required: true
+  },
+  
   // Relaciones
   parentTask: { 
     type: mongoose.Schema.Types.ObjectId, 
@@ -217,6 +224,7 @@ const TaskSchema = new mongoose.Schema({
 TaskSchema.index({ status: 1, boardStatus: 1 });
 TaskSchema.index({ assignedTo: 1 });
 TaskSchema.index({ createdBy: 1 });
+TaskSchema.index({ boardId: 1 });
 TaskSchema.index({ 'github.branch': 1 });
 TaskSchema.index({ 'sprint.id': 1 });
 TaskSchema.index({ tags: 1 });

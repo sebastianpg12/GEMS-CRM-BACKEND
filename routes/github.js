@@ -53,7 +53,7 @@ router.get('/repos/:owner/:repo/branches', async (req, res) => {
 // Crear rama desde una tarea
 router.post('/tasks/:taskId/create-branch', async (req, res) => {
   try {
-    const { baseBranch } = req.body;
+    const { baseBranch, branchName: customBranchName } = req.body;
     const task = await Task.findById(req.params.taskId);
     
     if (!task) {
@@ -64,8 +64,8 @@ router.post('/tasks/:taskId/create-branch', async (req, res) => {
       return res.status(400).json({ error: 'Tarea no tiene repositorio configurado' });
     }
     
-    // Generar nombre de rama
-    const branchName = githubService.generateBranchName(
+    // Generar nombre de rama (usar personalizado si existe, sino auto-generar)
+    const branchName = customBranchName || githubService.generateBranchName(
       task.type,
       task._id.toString().substring(0, 8),
       task.title
