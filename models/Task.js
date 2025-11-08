@@ -12,10 +12,10 @@ const TaskSchema = new mongoose.Schema({
     default: ''
   },
   
-  // Tipo de tarea (similar a Azure DevOps)
+  // Tipo de tarea (jerarquía Scrum completa)
   type: { 
     type: String, 
-    enum: ['task', 'bug', 'feature', 'user-story', 'epic'],
+    enum: ['epic', 'feature', 'user-story', 'task', 'bug', 'subtask'],
     default: 'task'
   },
   
@@ -60,9 +60,24 @@ const TaskSchema = new mongoose.Schema({
     default: null
   },
   
-  // Relaciones
+  // Relaciones jerárquicas Scrum
   parentTask: { 
     type: mongoose.Schema.Types.ObjectId, 
+    ref: 'Task',
+    default: null
+  },
+  epicId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Task',
+    default: null
+  },
+  featureId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Task',
+    default: null
+  },
+  userStoryId: {
+    type: mongoose.Schema.Types.ObjectId,
     ref: 'Task',
     default: null
   },
