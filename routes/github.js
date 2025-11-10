@@ -50,6 +50,26 @@ router.get('/repos/:owner/:repo/branches', async (req, res) => {
   }
 });
 
+// Eliminar rama
+router.delete('/repos/:owner/:repo/branches/:branchName', async (req, res) => {
+  try {
+    const { owner, repo, branchName } = req.params;
+    
+    // Prevenir eliminación de ramas protegidas
+    const protectedBranches = ['main', 'master', 'develop', 'production'];
+    if (protectedBranches.includes(branchName.toLowerCase())) {
+      return res.status(403).json({ 
+        error: `Cannot delete protected branch: ${branchName}` 
+      });
+    }
+    
+    const result = await githubService.deleteBranch(owner, repo, branchName);
+    res.json(result);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
 // Crear rama desde una tarea
 router.post('/tasks/:taskId/create-branch', async (req, res) => {
   try {

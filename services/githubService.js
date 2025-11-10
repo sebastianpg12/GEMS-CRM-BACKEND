@@ -104,6 +104,20 @@ class GitHubService {
     }
   }
 
+  // Eliminar rama
+  async deleteBranch(owner, repo, branchName) {
+    try {
+      await axios.delete(
+        `${this.baseURL}/repos/${owner}/${repo}/git/refs/heads/${branchName}`,
+        { headers: this.getHeaders() }
+      );
+      return { success: true, message: `Branch ${branchName} deleted successfully` };
+    } catch (error) {
+      console.error('Error deleting branch:', error.message);
+      throw error;
+    }
+  }
+
   // ==================== COMMITS ====================
 
   // Listar commits de una rama
