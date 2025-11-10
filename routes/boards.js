@@ -15,7 +15,8 @@ router.get('/', async (req, res) => {
     const userId = req.user.id || req.user._id;
     
     const boards = await Board.findByUser(userId)
-      .populate('members.userId', 'name email photo role');
+      .populate('members.userId', 'name email photo role')
+      .populate('client', 'name company email phone');
     
     res.json(boards);
   } catch (error) {
@@ -28,7 +29,8 @@ router.get('/:id', async (req, res) => {
   try {
     const board = await Board.findById(req.params.id)
       .populate('createdBy', 'name email photo')
-      .populate('members.userId', 'name email photo role');
+      .populate('members.userId', 'name email photo role')
+      .populate('client', 'name company email phone');
     
     if (!board) {
       return res.status(404).json({ error: 'Board no encontrado' });
@@ -107,6 +109,7 @@ router.post('/', async (req, res) => {
     
     await board.populate('createdBy', 'name email photo');
     await board.populate('members.userId', 'name email photo role');
+    await board.populate('client', 'name company email phone');
     
     res.status(201).json(board);
   } catch (error) {
@@ -281,10 +284,16 @@ router.patch('/:id/sprints/:sprintId/activate', async (req, res) => {
       }
     });
     
-    // Activar el sprint seleccionado
-    const sprint = board.sprints.find(s => s.id === req.params.sprintId);
+    // Activar el sprint seleccionado (buscar por id o _id)
+    const sprint = board.sprints.find(s => 
+      (s.id && s.id === req.params.sprintId) || 
+      (s._id && s._id.toString() === req.params.sprintId)
+    );
+    
     if (sprint) {
       sprint.status = 'active';
+    } else {
+      return res.status(404).json({ error: 'Sprint no encontrado' });
     }
     
     await board.save();
@@ -304,7 +313,10 @@ router.patch('/:id/sprints/:sprintId/complete', async (req, res) => {
       return res.status(404).json({ error: 'Board no encontrado' });
     }
     
-    const sprint = board.sprints.find(s => s.id === req.params.sprintId);
+    const sprint = board.sprints.find(s => 
+      (s.id && s.id === req.params.sprintId) || 
+      (s._id && s._id.toString() === req.params.sprintId)
+    );
     
     if (!sprint) {
       return res.status(404).json({ error: 'Sprint no encontrado' });
@@ -319,6 +331,75 @@ router.patch('/:id/sprints/:sprintId/complete', async (req, res) => {
     sprint.velocity = sprintTasks
       .filter(t => t.boardStatus === 'done')
       .reduce((sum, t) => sum + (t.estimatedHours || 0), 0);
+    
+    await board.save();
+    
+    res.json(board);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// Actualizar sprint
+router.patch('/:id/sprints/:sprintId', async (req, res) => {
+  try {
+    const board = await Board.findById(req.params.id);
+    
+    if (!board) {
+      return res.status(404).json({ error: 'Board no encontrado' });
+    }
+    
+    const sprint = board.sprints.find(s => 
+      (s.id && s.id === req.params.sprintId) || 
+      (s._id && s._id.toString() === req.params.sprintId)
+    );
+    
+    if (!sprint) {
+      return res.status(404).json({ error: 'Sprint no encontrado' });
+    }
+    
+    // Actualizar campos permitidos
+    if (req.body.name) sprint.name = req.body.name;
+    if (req.body.goal) sprint.goal = req.body.goal;
+    if (req.body.startDate) sprint.startDate = req.body.startDate;
+    if (req.body.endDate) sprint.endDate = req.body.endDate;
+    if (req.body.status) sprint.status = req.body.status;
+    
+    await board.save();
+    
+    res.json(board);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// Eliminar sprint
+router.delete('/:id/sprints/:sprintId', async (req, res) => {
+  try {
+    const board = await Board.findById(req.params.id);
+    
+    if (!board) {
+      return res.status(404).json({ error: 'Board no encontrado' });
+    }
+    
+    const sprintIndex = board.sprints.findIndex(s => 
+      (s.id && s.id === req.params.sprintId) || 
+      (s._id && s._id.toString() === req.params.sprintId)
+    );
+    
+    if (sprintIndex === -1) {
+      return res.status(404).json({ error: 'Sprint no encontrado' });
+    }
+    
+    const sprint = board.sprints[sprintIndex];
+    
+    // No permitir eliminar sprints activos
+    if (sprint.status === 'active') {
+      return res.status(400).json({ error: 'No se puede eliminar un sprint activo. Primero compĺetalo o desactívalo.' });
+    }
+    
+    // Eliminar el sprint
+    board.sprints.splice(sprintIndex, 1);
     
     await board.save();
     

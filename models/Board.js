@@ -93,6 +93,13 @@ const BoardSchema = new mongoose.Schema({
     default: null
   },
   
+  // Cliente/Proyecto asociado
+  client: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Client',
+    default: null
+  },
+  
   // Integración con GitHub
   github: {
     connected: {
