@@ -76,13 +76,26 @@ router.post('/tasks/:taskId/create-branch', async (req, res) => {
     const { baseBranch, branchName: customBranchName } = req.body;
     const task = await Task.findById(req.params.taskId);
     
+    console.log(`[GitHub Route] Create branch request for task: ${req.params.taskId}`);
+    console.log(`[GitHub Route] Base branch: ${baseBranch}, Custom name: ${customBranchName}`);
+    
     if (!task) {
+      console.log('[GitHub Route] Task not found');
       return res.status(404).json({ error: 'Tarea no encontrada' });
     }
     
-    if (!task.github.repoOwner || !task.github.repoName) {
-      return res.status(400).json({ error: 'Tarea no tiene repositorio configurado' });
+    if (!task.github || !task.github.repoOwner || !task.github.repoName) {
+      console.log('[GitHub Route] Task missing repository info:', task.github);
+      return res.status(400).json({ 
+        error: 'Tarea no tiene repositorio configurado. Primero selecciona un repositorio en el modal.',
+        details: {
+          repoOwner: task.github?.repoOwner,
+          repoName: task.github?.repoName
+        }
+      });
     }
+    
+    console.log(`[GitHub Route] Repository: ${task.github.repoOwner}/${task.github.repoName}`);
     
     // Generar nombre de rama (usar personalizado si existe, sino auto-generar)
     const branchName = customBranchName || githubService.generateBranchName(
@@ -90,6 +103,8 @@ router.post('/tasks/:taskId/create-branch', async (req, res) => {
       task._id.toString().substring(0, 8),
       task.title
     );
+    
+    console.log(`[GitHub Route] Generated branch name: ${branchName}`);
     
     // Crear rama en GitHub
     const branch = await githubService.createBranch(
@@ -105,11 +120,14 @@ router.post('/tasks/:taskId/create-branch', async (req, res) => {
     task.github.lastSync = new Date();
     await task.save();
     
+    console.log('[GitHub Route] Branch created and task updated successfully');
+    
     res.json({
       task,
       branch
     });
   } catch (error) {
+    console.error('[GitHub Route] Error:', error.message);
     res.status(400).json({ error: error.message });
   }
 });

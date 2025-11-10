@@ -83,9 +83,27 @@ class GitHubService {
   // Crear nueva rama
   async createBranch(owner, repo, branchName, fromBranch = 'main') {
     try {
-      // Primero obtener el SHA de la rama base
-      const baseBranch = await this.getBranch(owner, repo, fromBranch);
+      console.log(`[GitHub] Creating branch: ${branchName} from ${fromBranch} in ${owner}/${repo}`);
+      
+      // Primero verificar que el repositorio existe
+      await this.getRepository(owner, repo);
+      
+      // Intentar obtener la rama base
+      let baseBranch;
+      try {
+        baseBranch = await this.getBranch(owner, repo, fromBranch);
+      } catch (error) {
+        // Si no existe 'main', intentar con 'master'
+        if (fromBranch === 'main') {
+          console.log(`[GitHub] Branch 'main' not found, trying 'master'`);
+          baseBranch = await this.getBranch(owner, repo, 'master');
+        } else {
+          throw new Error(`Branch '${fromBranch}' not found in repository ${owner}/${repo}`);
+        }
+      }
+      
       const sha = baseBranch.commit.sha;
+      console.log(`[GitHub] Base branch SHA: ${sha}`);
 
       // Crear la nueva rama
       const response = await axios.post(
@@ -97,9 +115,13 @@ class GitHubService {
         { headers: this.getHeaders() }
       );
 
+      console.log(`[GitHub] Branch created successfully: ${branchName}`);
       return response.data;
     } catch (error) {
-      console.error('Error creating branch:', error.message);
+      console.error('[GitHub] Error creating branch:', error.response?.data || error.message);
+      if (error.response?.status === 404) {
+        throw new Error(`Repository ${owner}/${repo} not found or you don't have access`);
+      }
       throw error;
     }
   }
