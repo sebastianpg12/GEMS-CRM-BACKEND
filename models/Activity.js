@@ -18,6 +18,7 @@ const ActivitySchema = new mongoose.Schema({
   },
   dueDate: { type: Date },
   estimatedTime: { type: String }, // Ej: "2 horas", "30 minutos"
+  taskId: { type: String }, // ✅ ID de la tarea del board asociada (para sincronización)
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }, // Quien creó la actividad
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now }
