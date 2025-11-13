@@ -51,9 +51,14 @@ router.get('/repos/:owner/:repo/branches', async (req, res) => {
 });
 
 // Eliminar rama
-router.delete('/repos/:owner/:repo/branches/:branchName', async (req, res) => {
+// Usar un parámetro que capture slashes en el nombre de la rama
+router.delete('/repos/:owner/:repo/branches/:branchName(*)', async (req, res) => {
   try {
-    const { owner, repo, branchName } = req.params;
+    const { owner, repo } = req.params;
+    // branchName puede contener slashes; Express decodificará percent-encoding
+    const branchName = req.params.branchName;
+
+    console.log(`[GitHub Route] Delete branch request: ${owner}/${repo} -> ${branchName}`);
     
     // Prevenir eliminación de ramas protegidas
     const protectedBranches = ['main', 'master', 'develop', 'production'];
@@ -66,6 +71,7 @@ router.delete('/repos/:owner/:repo/branches/:branchName', async (req, res) => {
     const result = await githubService.deleteBranch(owner, repo, branchName);
     res.json(result);
   } catch (error) {
+    console.error('[GitHub Route] Error deleting branch:', error);
     res.status(400).json({ error: error.message });
   }
 });
