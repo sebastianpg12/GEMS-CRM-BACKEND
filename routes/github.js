@@ -151,6 +151,7 @@ router.post('/tasks/:taskId/create-branch', async (req, res) => {
     // Actualizar tarea con info de la rama
     task.github.branch = branchName;
     task.github.branchUrl = `https://github.com/${task.github.repoOwner}/${task.github.repoName}/tree/${branchName}`;
+    task.github.baseBranch = baseBranch || 'main'; // Guardar la rama base para el PR
     task.github.lastSync = new Date();
     await task.save();
     
@@ -227,8 +228,11 @@ router.post('/tasks/:taskId/create-pr', async (req, res) => {
       return res.status(400).json({ error: 'Tarea no tiene rama asignada' });
     }
 
+    // Determinar la rama base: preferencia al parámetro, luego a la guardada en la tarea, luego 'main'
+    const baseBranch = base || task.github.baseBranch || 'main';
+
     console.log(`[GitHub Route] Creating PR for task: ${req.params.taskId}`);
-    console.log(`[GitHub Route] Branch: ${task.github.branch}, Base: ${base || 'main'}`);
+    console.log(`[GitHub Route] Branch: ${task.github.branch}, Base: ${baseBranch}`);
     
     // Crear PR en GitHub
     const pr = await githubService.createPullRequest(
@@ -236,7 +240,7 @@ router.post('/tasks/:taskId/create-pr', async (req, res) => {
       task.github.repoName,
       title || task.title,
       task.github.branch,
-      base || 'main',
+      baseBranch,
       body || task.description
     );
     
