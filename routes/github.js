@@ -67,10 +67,38 @@ router.delete('/repos/:owner/:repo/branches/:branchName(*)', async (req, res) =>
         error: `Cannot delete protected branch: ${branchName}` 
       });
     }
+
+    // Comprobar si existen Pull Requests abiertos que usen esta rama como head
+    try {
+      const openPRs = await githubService.listPullRequests(owner, repo, 'open');
+      const conflictingPR = openPRs.find(pr => pr.head && pr.head.ref === branchName);
+      if (conflictingPR) {
+        return res.status(409).json({
+          error: `Cannot delete branch: Pull Request #${conflictingPR.number} is open for this branch.`,
+          pr: {
+            number: conflictingPR.number,
+            url: conflictingPR.html_url,
+            title: conflictingPR.title
+          }
+        });
+      }
+    } catch (prCheckError) {
+      console.warn('[GitHub Route] Could not check open PRs before deleting branch:', prCheckError.message || prCheckError);
+      // No bloquear la eliminación si la comprobación de PR falla; seguir e intentar eliminar.
+    }
     
+    // Intentar eliminar la rama en GitHub
     const result = await githubService.deleteBranch(owner, repo, branchName);
     res.json(result);
   } catch (error) {
+    // Si el error viene de GitHub (axios), reenviar el código y el mensaje original
+    if (error.response && error.response.status) {
+      const statusCode = error.response.status;
+      const serverMsg = error.response.data?.message || error.response.data || error.message;
+      console.error('[GitHub Route] GitHub API error deleting branch:', statusCode, serverMsg);
+      return res.status(statusCode).json({ error: serverMsg });
+    }
+
     console.error('[GitHub Route] Error deleting branch:', error);
     res.status(400).json({ error: error.message });
   }
