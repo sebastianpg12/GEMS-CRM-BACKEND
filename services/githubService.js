@@ -205,6 +205,8 @@ class GitHubService {
   // Crear pull request
   async createPullRequest(owner, repo, title, head, base, body = '') {
     try {
+      console.log(`[GitHub] Creating PR: ${title}`);
+      console.log(`[GitHub] Head branch: ${head}, Base branch: ${base}`);
       const response = await axios.post(
         `${this.baseURL}/repos/${owner}/${repo}/pulls`,
         {
@@ -215,9 +217,14 @@ class GitHubService {
         },
         { headers: this.getHeaders() }
       );
+      console.log(`[GitHub] PR created successfully: #${response.data.number}`);
       return response.data;
     } catch (error) {
-      console.error('Error creating pull request:', error.message);
+      // Log completo del error de GitHub
+      const status = error.response?.status;
+      const githubError = error.response?.data;
+      console.error(`[GitHub] Error creating PR (Status ${status}):`, JSON.stringify(githubError, null, 2));
+      console.error(`[GitHub] Error details:`, error.message);
       throw error;
     }
   }

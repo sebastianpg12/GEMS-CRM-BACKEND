@@ -226,6 +226,9 @@ router.post('/tasks/:taskId/create-pr', async (req, res) => {
     if (!task.github.branch) {
       return res.status(400).json({ error: 'Tarea no tiene rama asignada' });
     }
+
+    console.log(`[GitHub Route] Creating PR for task: ${req.params.taskId}`);
+    console.log(`[GitHub Route] Branch: ${task.github.branch}, Base: ${base || 'main'}`);
     
     // Crear PR en GitHub
     const pr = await githubService.createPullRequest(
@@ -248,11 +251,31 @@ router.post('/tasks/:taskId/create-pr', async (req, res) => {
     
     await task.save();
     
+    console.log(`[GitHub Route] PR created and task updated successfully`);
     res.json({
       task,
       pullRequest: pr
     });
   } catch (error) {
+    // Si es error de GitHub (axios), reenviar detalles
+    if (error.response && error.response.status) {
+      const statusCode = error.response.status;
+      const githubData = error.response.data;
+      console.error(`[GitHub Route] GitHub API error (${statusCode}):`, githubData);
+      
+      // Extraer mensaje útil del error de GitHub
+      let errorMsg = githubData?.message || error.message;
+      if (githubData?.errors && Array.isArray(githubData.errors)) {
+        errorMsg = githubData.errors.map(e => e.message).join(', ');
+      }
+      
+      return res.status(statusCode).json({
+        error: errorMsg,
+        details: githubData?.errors || githubData?.documentation_url
+      });
+    }
+    
+    console.error('[GitHub Route] Error creating PR:', error.message);
     res.status(400).json({ error: error.message });
   }
 });
