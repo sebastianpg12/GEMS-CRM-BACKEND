@@ -19,10 +19,10 @@ const userSchema = new mongoose.Schema({
     required: true,
     minlength: 6
   },
-  role: {
+    role: {
     type: String,
     required: true,
-    enum: ['admin', 'manager', 'employee', 'viewer'],
+    enum: ['admin', 'manager', 'employee', 'support', 'client', 'viewer'],
     default: 'employee'
   },
   avatar: {
@@ -148,6 +148,28 @@ userSchema.pre('save', function(next) {
         accounting: { view: false, create: false, edit: false, delete: false },
         cases: { view: true, create: false, edit: false, delete: false }, // Empleado solo puede VER casos
         team: { view: true, create: false, edit: false, delete: false } // Empleado solo puede VER equipo
+      };
+      break;
+    case 'support':
+      this.permissions = {
+        dashboard: true,
+        clients: { view: false, create: false, edit: false, delete: false },
+        activities: { view: true, create: true, edit: true, delete: true },
+        reports: { view: false, export: false },
+        accounting: { view: false, create: false, edit: false, delete: false },
+        cases: { view: true, create: true, edit: true, delete: true },
+        team: { view: true, create: false, edit: false, delete: false }
+      };
+      break;
+    case 'client':
+      this.permissions = {
+        dashboard: false,
+        clients: { view: false, create: false, edit: false, delete: false },
+        activities: { view: false, create: false, edit: false, delete: false },
+        reports: { view: false, export: false },
+        accounting: { view: false, create: false, edit: false, delete: false },
+        cases: { view: false, create: false, edit: false, delete: false },
+        team: { view: false, create: false, edit: false, delete: false }
       };
       break;
     case 'viewer':

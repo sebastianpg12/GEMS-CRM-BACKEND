@@ -81,6 +81,7 @@ const taskReportsRoutes = require('./routes/taskReports');
 const tasksRoutes = require('./routes/tasks');
 const boardsRoutes = require('./routes/boards');
 const githubRoutes = require('./routes/github');
+const ticketsRoutes = require('./routes/tickets');
 
 // Usar rutas
 app.use('/api/auth', authRoutes);
@@ -104,6 +105,7 @@ app.use('/api/task-reports', taskReportsRoutes);
 app.use('/api/tasks', tasksRoutes);
 app.use('/api/boards', boardsRoutes);
 app.use('/api/github', githubRoutes);
+app.use('/api/tickets', ticketsRoutes);
 
 // Conexión a MongoDB usando .env
 mongoose.connect(process.env.MONGO_URI, {
