@@ -107,6 +107,34 @@ app.use('/api/boards', boardsRoutes);
 app.use('/api/github', githubRoutes);
 app.use('/api/tickets', ticketsRoutes);
 
+// TEMPORARY: Route to setup test client user
+app.get('/api/setup-client-test', async (req, res) => {
+  try {
+    const User = require('./models/User');
+    const email = 'cliente@test.com';
+    const existing = await User.findOne({ email });
+    
+    if (existing) {
+      existing.role = 'client';
+      existing.password = 'cliente123'; // Pre-save hook will hash it
+      await existing.save();
+      return res.json({ message: 'Usuario actualizado con éxito', email });
+    }
+    
+    const newUser = new User({
+      name: 'Cliente de Prueba',
+      email,
+      password: 'cliente123',
+      role: 'client'
+    });
+    
+    await newUser.save();
+    res.json({ message: 'Usuario CLIENTE creado con éxito', email });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Conexión a MongoDB usando .env
 mongoose.connect(process.env.MONGO_URI, {
   useNewUrlParser: true,

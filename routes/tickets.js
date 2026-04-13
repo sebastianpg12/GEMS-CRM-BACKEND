@@ -20,6 +20,9 @@ const getPriorityText = (priority) => {
 // Create ticket from public form
 router.post('/public', async (req, res) => {
   try {
+    console.log('--- DEBUG: Public Ticket Creation ---');
+    console.log('Body received:', JSON.stringify(req.body, null, 2));
+    
     const { subject, description, category, priority, name, email, clientId } = req.body;
 
     // 1. Create the Ticket
