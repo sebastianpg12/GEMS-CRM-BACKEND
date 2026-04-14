@@ -3,6 +3,29 @@ const router = express.Router();
 const Ticket = require('../models/Ticket');
 const User = require('../models/User');
 const { authenticateToken, requireRole } = require('../middleware/auth');
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
+
+// Configure multer for ticket attachments
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    const dir = 'uploads/tickets/';
+    if (!fs.existsSync(dir)){
+      fs.mkdirSync(dir, { recursive: true });
+    }
+    cb(null, dir);
+  },
+  filename: function (req, file, cb) {
+    cb(null, 'ticket-' + Date.now() + '-' + Math.round(Math.random() * 1E9) + path.extname(file.originalname));
+  }
+});
+
+const upload = multer({ 
+  storage: storage,
+  limits: { fileSize: 10 * 1024 * 1024 } // 10MB limit per file
+});
+
 
 // Helper for WhatsApp Priority Text
 const getPriorityText = (priority) => {
@@ -17,13 +40,21 @@ const getPriorityText = (priority) => {
 
 // --- PUBLIC ROUTES (No Auth) ---
 
-// Create ticket from public form
-router.post('/public', async (req, res) => {
+// Create ticket from public form (with attachments)
+router.post('/public', upload.array('files', 5), async (req, res) => {
   try {
-    console.log('--- DEBUG: Public Ticket Creation ---');
-    console.log('Body received:', JSON.stringify(req.body, null, 2));
+    console.log('--- DEBUG: Received Public Ticket ---');
+    console.log('Headers:', req.headers['content-type']);
+    console.log('Body:', req.body);
+    console.log('Files:', req.files?.length || 0);
+
+    const { subject, description, category, priority, name, email, clientId, userId } = req.body;
+
     
-    const { subject, description, category, priority, name, email, clientId } = req.body;
+    let attachments = [];
+    if (req.files && req.files.length > 0) {
+      attachments = req.files.map(file => `/uploads/tickets/${file.filename}`);
+    }
 
     // 1. Create the Ticket
     const ticket = new Ticket({
@@ -31,8 +62,10 @@ router.post('/public', async (req, res) => {
       description,
       category,
       priority,
-      submittedBy: { name, email, clientId }
+      attachments,
+      submittedBy: { name, email, clientId, userId }
     });
+
 
     // 2. Auto-assignment Logic
     const supportAgents = await User.find({ role: 'support', isActive: true });
@@ -139,7 +172,7 @@ router.get('/', authenticateToken, async (req, res) => {
   }
 });
 
-// Get my assigned tickets
+// Get my assigned tickets (Agent view)
 router.get('/my', authenticateToken, async (req, res) => {
   try {
     const userId = req.user._id;
@@ -152,6 +185,29 @@ router.get('/my', authenticateToken, async (req, res) => {
     res.status(500).json({ success: false, error: error.message });
   }
 });
+
+// Get my ticket history (Client view)
+router.get('/client-history', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user._id;
+    const email = req.user.email;
+    
+    // Find tickets submitted by this user (either by ID if associated or by email)
+    const tickets = await Ticket.find({
+      $or: [
+        { 'submittedBy.userId': userId },
+        { 'submittedBy.email': email }
+      ]
+    })
+    .populate('assignedTo', 'name email avatar position')
+    .sort({ createdAt: -1 });
+
+    res.json({ success: true, data: tickets });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 
 // Get ticket detail
 router.get('/:id', authenticateToken, async (req, res) => {
