@@ -92,8 +92,12 @@ router.post('/public', upload.array('files', 5), async (req, res) => {
 
     await ticket.save();
 
+    // Populate for response
+    const populatedTicket = await Ticket.findById(ticket._id)
+      .populate('assignedTo', 'name email avatar');
+
     // ── Email notifications (non-blocking) ──
-    notifyTicketCreated(ticket, assignedAgent).catch(e => console.error('[Email] Error notifyTicketCreated:', e.message));
+    notifyTicketCreated(populatedTicket || ticket, assignedAgent).catch(e => console.error('[Email] Error notifyTicketCreated:', e.message));
 
     // 3. WhatsApp Notification
     try {
@@ -138,7 +142,7 @@ router.post('/public', upload.array('files', 5), async (req, res) => {
 
     res.status(201).json({
       success: true,
-      data: ticket,
+      data: populatedTicket || ticket,
       message: 'Ticket creado exitosamente'
     });
   } catch (error) {
