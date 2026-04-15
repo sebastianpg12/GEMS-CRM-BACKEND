@@ -76,6 +76,7 @@ router.get('/', async (req, res) => {
       .populate('cliente_id', 'nombre empresa email')
       .populate('asignado_a', 'name email role')
       .populate('comentarios.autor', 'name email')
+      .populate('dailyLogs.autor', 'name email avatar')
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(parseInt(limit));
@@ -102,7 +103,8 @@ router.get('/:id', async (req, res) => {
     const case_item = await Case.findById(req.params.id)
       .populate('cliente_id', 'nombre empresa email telefono')
       .populate('asignado_a', 'name email role avatar')
-      .populate('comentarios.autor', 'name email avatar');
+      .populate('comentarios.autor', 'name email avatar')
+      .populate('dailyLogs.autor', 'name email avatar');
     
     if (!case_item) {
       return res.status(404).json({ error: 'Caso no encontrado' });
@@ -246,6 +248,8 @@ router.put('/:id', upload.array('archivos', 10), async (req, res) => {
       estado: req.body.estado || case_item.estado,
       prioridad: req.body.prioridad || case_item.prioridad,
       progreso: req.body.progreso ? parseInt(req.body.progreso) : case_item.progreso,
+      metodologia: req.body.metodologia || case_item.metodologia,
+      wikiContent: req.body.wikiContent || case_item.wikiContent,
       updatedAt: new Date()
     };
 
@@ -453,6 +457,37 @@ router.get('/stats/summary', async (req, res) => {
   } catch (error) {
     console.error('Error getting stats:', error);
     res.status(500).json({ error: 'Error al obtener estadísticas' });
+  }
+});
+
+// POST - Agregar log diario a un caso
+router.post('/:id/daily-logs', async (req, res) => {
+  try {
+    const case_item = await Case.findById(req.params.id);
+    if (!case_item) {
+      return res.status(404).json({ error: 'Caso no encontrado' });
+    }
+    
+    const log = {
+      autor: req.body.autor,
+      que_se_hizo: req.body.que_se_hizo,
+      bloqueos: req.body.bloqueos,
+      siguientes_pasos: req.body.siguientes_pasos,
+      sentimiento: req.body.sentimiento || '😐',
+      fecha: new Date()
+    };
+    
+    if (!case_item.dailyLogs) case_item.dailyLogs = [];
+    case_item.dailyLogs.unshift(log); // Lo más nuevo arriba
+    await case_item.save();
+    
+    const updatedCase = await Case.findById(req.params.id)
+      .populate('dailyLogs.autor', 'name email avatar');
+    
+    res.json(updatedCase.dailyLogs[0]);
+  } catch (error) {
+    console.error('Error adding daily log:', error);
+    res.status(400).json({ error: 'Error al agregar el seguimiento diario' });
   }
 });
 

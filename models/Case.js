@@ -106,6 +106,30 @@ const CaseSchema = new mongoose.Schema({
     completado: { type: Boolean, default: false }
   }],
   
+  // Nuevo: Contenido tipo Wiki / Base de Conocimiento
+  wikiContent: {
+    type: String, // HTML o Markdown enriquecido
+    required: false
+  },
+  metodologia: {
+    type: String,
+    required: false
+  },
+  
+  // Nuevo: Seguimiento Diario (Daily Logs)
+  dailyLogs: [{
+    fecha: { type: Date, default: Date.now },
+    autor: { type: mongoose.Schema.Types.ObjectId, ref: 'Team' },
+    que_se_hizo: String,
+    bloqueos: String,
+    siguientes_pasos: String,
+    sentimiento: { 
+      type: String, 
+      enum: ['😊', '😐', '😟', '🔥'], // Estado de ánimo del caso
+      default: '😐' 
+    }
+  }],
+
   createdAt: { 
     type: Date, 
     default: Date.now 
