@@ -7,6 +7,8 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 
+const { notifyTicketCreated, notifyStatusChanged } = require('../services/emailService');
+
 // Configure multer for ticket attachments
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
@@ -43,13 +45,7 @@ const getPriorityText = (priority) => {
 // Create ticket from public form (with attachments)
 router.post('/public', upload.array('files', 5), async (req, res) => {
   try {
-    console.log('--- DEBUG: Received Public Ticket ---');
-    console.log('Headers:', req.headers['content-type']);
-    console.log('Body:', req.body);
-    console.log('Files:', req.files?.length || 0);
-
     const { subject, description, category, priority, name, email, clientId, userId } = req.body;
-
     
     let attachments = [];
     if (req.files && req.files.length > 0) {
@@ -69,6 +65,7 @@ router.post('/public', upload.array('files', 5), async (req, res) => {
 
     // 2. Auto-assignment Logic
     const supportAgents = await User.find({ role: 'support', isActive: true });
+    let assignedAgent = null;
     
     if (supportAgents.length > 0) {
       // Find agent with fewest active tickets
@@ -80,20 +77,19 @@ router.post('/public', upload.array('files', 5), async (req, res) => {
         return { agent, count };
       }));
 
-      // Sort by load
       agentLoads.sort((a, b) => a.count - b.count);
-      const chosenAgent = agentLoads[0].agent;
+      assignedAgent = agentLoads[0].agent;
       
-      ticket.assignedTo = chosenAgent._id;
-      ticket.status = 'open'; // Change from new to open since it's assigned
+      ticket.assignedTo = assignedAgent._id;
+      ticket.status = 'open'; 
     }
 
     await ticket.save();
 
-    // 3. WhatsApp Notification
-    const populatedTicket = await Ticket.findById(ticket._id)
-      .populate('assignedTo', 'name email phone');
+    // ── Email notifications (non-blocking) ──
+    notifyTicketCreated(ticket, assignedAgent).catch(e => console.error('[Email] Error notifyTicketCreated:', e.message));
 
+    // 3. WhatsApp Notification
     try {
       const baileysSock = req.app.get('baileysSock');
       const baileysReady = req.app.get('baileysReady');
@@ -110,21 +106,20 @@ router.post('/public', upload.array('files', 5), async (req, res) => {
 
         if (groupId) {
           let msg = `*🎫 NUEVO TICKET RECIBIDO*\n\n`;
-          msg += `*Número:* ${populatedTicket.ticketNumber}\n`;
-          msg += `*Asunto:* ${populatedTicket.subject}\n`;
-          msg += `*Cliente:* ${populatedTicket.submittedBy.name} (${populatedTicket.submittedBy.email})\n`;
-          msg += `*Categoría:* ${populatedTicket.category}\n`;
-          msg += `*Prioridad:* ${getPriorityText(populatedTicket.priority)}\n\n`;
+          msg += `*Número:* ${ticket.ticketNumber}\n`;
+          msg += `*Asunto:* ${ticket.subject}\n`;
+          msg += `*Cliente:* ${ticket.submittedBy.name} (${ticket.submittedBy.email})\n`;
+          msg += `*Prioridad:* ${getPriorityText(ticket.priority)}\n\n`;
           
-          if (populatedTicket.assignedTo) {
-            msg += `👤 *Asignado a:* ${populatedTicket.assignedTo.name}`;
+          if (assignedAgent) {
+            msg += `👤 *Asignado a:* ${assignedAgent.name}`;
           } else {
-            msg += `⚠️ *Estado:* Sin asignar (No hay agentes de soporte disponibles)`;
+            msg += `⚠️ *Estado:* Sin asignar`;
           }
 
           let mentions = [];
-          if (populatedTicket.assignedTo?.phone) {
-            const jid = `${populatedTicket.assignedTo.phone.replace(/\D/g, '')}@s.whatsapp.net`;
+          if (assignedAgent?.phone) {
+            const jid = `${assignedAgent.phone.replace(/\D/g, '')}@s.whatsapp.net`;
             mentions.push(jid);
           }
 
@@ -137,7 +132,7 @@ router.post('/public', upload.array('files', 5), async (req, res) => {
 
     res.status(201).json({
       success: true,
-      data: populatedTicket,
+      data: ticket,
       message: 'Ticket creado exitosamente'
     });
   } catch (error) {
@@ -230,20 +225,27 @@ router.get('/:id', authenticateToken, async (req, res) => {
 router.patch('/:id/status', authenticateToken, async (req, res) => {
   try {
     const { status } = req.body;
+    
+    const ticket = await Ticket.findById(req.params.id);
+    if (!ticket) {
+      return res.status(404).json({ success: false, message: 'Ticket no encontrado' });
+    }
+
+    const oldStatus = ticket.status;
     const updateData = { status, updatedAt: new Date() };
     
     if (status === 'resolved') {
       updateData.resolvedAt = new Date();
     }
 
-    const ticket = await Ticket.findByIdAndUpdate(req.params.id, updateData, { new: true })
+    const updatedTicket = await Ticket.findByIdAndUpdate(req.params.id, updateData, { new: true })
       .populate('assignedTo', 'name email avatar');
 
-    if (!ticket) {
-      return res.status(404).json({ success: false, message: 'Ticket no encontrado' });
+    if (status !== oldStatus) {
+      notifyStatusChanged(updatedTicket, oldStatus, status).catch(e => console.error('[Email] Error notifyStatusChanged:', e.message));
     }
 
-    res.json({ success: true, data: ticket });
+    res.json({ success: true, data: updatedTicket });
   } catch (error) {
     res.status(400).json({ success: false, error: error.message });
   }

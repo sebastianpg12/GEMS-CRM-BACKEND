@@ -143,9 +143,13 @@ mongoose.connect(process.env.MONGO_URI, {
 
 const db = mongoose.connection;
 db.on('error', console.error.bind(console, 'MongoDB connection error:'));
-db.once('open', () => {
+db.once('open', async () => {
   console.log('Connected to MongoDB');
   
+  // ─── One-time initialization ───
+  const { ensureSupportUser } = require('./services/initService');
+  await ensureSupportUser();
+
   // Inicializar el servicio de cron para reportes de tareas
   const { initTaskReportsCron } = require('./services/cronService');
   initTaskReportsCron(app);
