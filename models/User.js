@@ -22,7 +22,7 @@ const userSchema = new mongoose.Schema({
     role: {
     type: String,
     required: true,
-    enum: ['admin', 'manager', 'employee', 'support', 'client', 'viewer'],
+    enum: ['admin', 'manager', 'employee', 'support', 'development', 'fullstack', 'client', 'viewer'],
     default: 'employee'
   },
   avatar: {
@@ -151,6 +151,8 @@ userSchema.pre('save', function(next) {
       };
       break;
     case 'support':
+    case 'development':
+    case 'fullstack':
       this.permissions = {
         dashboard: true,
         clients: { view: false, create: false, edit: false, delete: false },
