@@ -6,10 +6,11 @@ async function ensureSupportUser() {
     const existing = await User.findOne({ email: supportEmail });
 
     if (existing) {
-      console.log(`[Init] Support user already exists (${supportEmail})`);
+      console.log(`[Init] Support user verified: ${existing.name} (${supportEmail}) - Status: ${existing.isActive ? 'Active' : 'Inactive'} - Role: ${existing.role}`);
       return;
     }
 
+    console.log(`[Init] Creating default support user: ${supportEmail}...`);
     const supportUser = new User({
       name: 'Soporte GEMS',
       email: supportEmail,
@@ -21,9 +22,9 @@ async function ensureSupportUser() {
     });
 
     await supportUser.save();
-    console.log(`[Init] Support user created successfully: ${supportEmail}`);
+    console.log(`[Init] Default support user created successfully.`);
   } catch (err) {
-    console.error('[Init] Error creating support user:', err.message);
+    console.error('[Init] CRITICAL ERROR ensuring support user:', err);
   }
 }
 

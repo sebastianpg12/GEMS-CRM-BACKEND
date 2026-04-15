@@ -66,6 +66,8 @@ router.post('/public', upload.array('files', 5), async (req, res) => {
 
     // 2. Auto-assignment Logic
     const supportAgents = await User.find({ role: 'support', isActive: true });
+    console.log(`[Tickets] Found ${supportAgents.length} active support agents for auto-assignment.`);
+    
     let assignedAgent = null;
     
     if (supportAgents.length > 0) {
@@ -83,6 +85,9 @@ router.post('/public', upload.array('files', 5), async (req, res) => {
       
       ticket.assignedTo = assignedAgent._id;
       ticket.status = 'open'; 
+      console.log(`[Tickets] Automatically assigned to: ${assignedAgent.name} (${assignedAgent.email})`);
+    } else {
+      console.warn('[Tickets] No active support agents found - ticket remains unassigned.');
     }
 
     await ticket.save();
