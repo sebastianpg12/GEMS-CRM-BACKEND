@@ -112,6 +112,7 @@ function ticketStatusChangedHtml(ticket, oldStatus, newStatus) {
 // ─── Exported notification helpers ───────────────────────────────────────────
 
 async function notifyTicketCreated(ticket, assignedAgent) {
+  console.log('[Email] notifyTicketCreated called for ticket:', ticket.ticketNumber || ticket._id);
   const supportEmail = process.env.SUPPORT_EMAIL || process.env.SMTP_USER;
   if (ticket.submittedBy?.email) {
     await sendMail({
