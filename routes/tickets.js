@@ -266,10 +266,16 @@ router.patch('/:id/status', authenticateToken, async (req, res) => {
   }
 });
 
-// Add comment
-router.post('/:id/comments', authenticateToken, async (req, res) => {
+// Add comment (with attachments)
+router.post('/:id/comments', authenticateToken, upload.array('files', 5), async (req, res) => {
   try {
     const { text, isInternal } = req.body;
+    
+    let commentAttachments = [];
+    if (req.files && req.files.length > 0) {
+      commentAttachments = req.files.map(file => `/uploads/tickets/${file.filename}`);
+    }
+
     const ticket = await Ticket.findById(req.params.id);
 
     if (!ticket) {
@@ -279,7 +285,8 @@ router.post('/:id/comments', authenticateToken, async (req, res) => {
     ticket.comments.push({
       text,
       author: req.user._id,
-      isInternal: isInternal || false
+      isInternal: isInternal === 'true' || isInternal === true,
+      attachments: commentAttachments
     });
 
     await ticket.save();

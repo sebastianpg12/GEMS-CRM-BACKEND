@@ -13,7 +13,8 @@ const ticketCommentSchema = new mongoose.Schema({
   isInternal: {
     type: Boolean,
     default: false
-  }
+  },
+  attachments: [String]
 }, {
   timestamps: true
 });
