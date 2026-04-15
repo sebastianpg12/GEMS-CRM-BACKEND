@@ -68,6 +68,10 @@ const ticketSchema = new mongoose.Schema({
   comments: [ticketCommentSchema],
   resolvedAt: {
     type: Date
+  },
+  slaNotified: {
+    type: Boolean,
+    default: false
   }
 }, {
   timestamps: true

@@ -140,4 +140,84 @@ async function notifyStatusChanged(ticket, oldStatus, newStatus) {
   }
 }
 
-module.exports = { sendMail, notifyTicketCreated, notifyStatusChanged };
+async function notifyNewComment(ticket, comment, author) {
+  const isAuthorAgent = author.role === 'support' || author.role === 'admin';
+
+  // 1. If agent commented, notify CLIENT (only if not internal)
+  if (isAuthorAgent && !comment.isInternal && ticket.submittedBy?.email) {
+    await sendMail({
+      to: ticket.submittedBy.email,
+      subject: `Nueva respuesta en su Ticket #${ticket.ticketNumber || ticket._id}`,
+      html: `
+        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #eee; border-radius: 12px; overflow: hidden;">
+          <div style="background: #111827; color: white; padding: 24px; text-align: center;">
+            <h2 style="margin: 0; font-size: 20px;">Actualización de Soporte</h2>
+          </div>
+          <div style="padding: 24px; color: #374151; line-height: 1.6;">
+            <p>Hola <strong>${ticket.submittedBy.name}</strong>,</p>
+            <p>Nuestro equipo ha respondido a tu ticket <strong>${ticket.subject}</strong>:</p>
+            <div style="background: #f9fafb; padding: 16px; border-radius: 8px; border-left: 4px solid #4f46e5; margin: 20px 0; font-style: italic;">
+              "${comment.text}"
+            </div>
+            <p>Puedes ver la conversación completa o responder desde tu panel de cliente.</p>
+          </div>
+        </div>
+      `
+    });
+  }
+
+  // 2. If client commented, notify AGENT
+  if (!isAuthorAgent && ticket.assignedTo?.email) {
+    await sendMail({
+      to: ticket.assignedTo.email,
+      subject: `El cliente respondió al Ticket #${ticket.ticketNumber || ticket._id}`,
+      html: `
+        <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #eee; border-radius: 12px; overflow: hidden;">
+          <div style="background: #4f46e5; color: white; padding: 24px;">
+            <h2 style="margin: 0;">Respuesta del Cliente</h2>
+          </div>
+          <div style="padding: 24px; color: #374151;">
+            <p>El cliente <strong>${ticket.submittedBy.name}</strong> ha dejado un nuevo comentario en el ticket <strong>#${ticket.ticketNumber || ticket._id}</strong>:</p>
+            <div style="background: #fef3c7; padding: 16px; border-radius: 8px; border-left: 4px solid #d97706; margin: 20px 0;">
+              "${comment.text}"
+            </div>
+          </div>
+        </div>
+      `
+    });
+  }
+}
+
+async function notifySLAAlert(ticket) {
+  const supportEmail = process.env.SUPPORT_EMAIL || process.env.SMTP_USER;
+  if (!supportEmail) return;
+
+  await sendMail({
+    to: supportEmail,
+    subject: `⚠️ ALERTA SLA: Ticket #${ticket.ticketNumber} pendiente`,
+    html: `
+      <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; border: 2px solid #ef4444; border-radius: 12px; overflow: hidden;">
+        <div style="background: #ef4444; color: white; padding: 24px; text-align: center;">
+          <h1 style="margin: 0; font-size: 20px;">🚨 ALERTA DE RETRASO</h1>
+        </div>
+        <div style="padding: 24px; color: #374151; line-height: 1.6;">
+          <p>El siguiente ticket lleva más de 2 horas sin ser atendido:</p>
+          <ul style="background: #fee2e2; padding: 16px; border-radius: 8px; list-style: none;">
+            <li><strong>Ticket:</strong> #${ticket.ticketNumber}</li>
+            <li><strong>Asunto:</strong> ${ticket.subject}</li>
+            <li><strong>Cliente:</strong> ${ticket.submittedBy.name}</li>
+            <li><strong>Estado:</strong> ${ticket.status}</li>
+          </ul>
+        </div>
+      </div>
+    `
+  });
+}
+
+module.exports = { 
+  sendMail, 
+  notifyTicketCreated, 
+  notifyStatusChanged,
+  notifyNewComment,
+  notifySLAAlert
+};

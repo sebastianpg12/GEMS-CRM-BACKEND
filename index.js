@@ -153,6 +153,31 @@ db.once('open', async () => {
   // Inicializar el servicio de cron para reportes de tareas
   const { initTaskReportsCron } = require('./services/cronService');
   initTaskReportsCron(app);
+
+  // ─── SLA Alert System (Every 15 minutes) ───
+  setInterval(async () => {
+    try {
+      const { notifySLAAlert } = require('./services/emailService');
+      const Ticket = require('./models/Ticket');
+      
+      const twoHoursAgo = new Date(Date.now() - 2 * 60 * 60 * 1000);
+      
+      const overdueTickets = await Ticket.find({
+        status: 'new',
+        slaNotified: { $ne: true },
+        createdAt: { $lt: twoHoursAgo }
+      });
+
+      for (const ticket of overdueTickets) {
+        console.log(`[SLA] Ticket #${ticket.ticketNumber} is overdue! Sending alert.`);
+        await notifySLAAlert(ticket);
+        ticket.slaNotified = true;
+        await ticket.save();
+      }
+    } catch (err) {
+      console.error('[SLA] Error running background check:', err);
+    }
+  }, 15 * 60 * 1000); // 15 mins
 });
 
 // Socket.io connection handling

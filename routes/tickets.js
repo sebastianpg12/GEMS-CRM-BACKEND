@@ -7,7 +7,12 @@ const multer = require('multer');
 const path = require('path');
 const fs = require('fs');
 
-const { notifyTicketCreated, notifyStatusChanged } = require('../services/emailService');
+const { 
+  notifyTicketCreated, 
+  notifyStatusChanged, 
+  notifyNewComment, 
+  notifySLAAlert 
+} = require('../services/emailService');
 
 // Configure multer for ticket attachments
 const storage = multer.diskStorage({
@@ -280,9 +285,15 @@ router.post('/:id/comments', authenticateToken, async (req, res) => {
     await ticket.save();
     
     const populatedTicket = await Ticket.findById(req.params.id)
+      .populate('assignedTo', 'name email')
       .populate('comments.author', 'name email avatar role');
 
-    res.json({ success: true, data: populatedTicket.comments[populatedTicket.comments.length - 1] });
+    const newComment = populatedTicket.comments[populatedTicket.comments.length - 1];
+    
+    // Notify via email (non-blocking)
+    notifyNewComment(populatedTicket, newComment, req.user).catch(e => console.error('[Email] Error notifyNewComment:', e.message));
+
+    res.json({ success: true, data: newComment });
   } catch (error) {
     res.status(400).json({ success: false, error: error.message });
   }
