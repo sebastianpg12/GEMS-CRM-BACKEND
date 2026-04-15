@@ -45,6 +45,7 @@ const getPriorityText = (priority) => {
 // Create ticket from public form (with attachments)
 router.post('/public', upload.array('files', 5), async (req, res) => {
   try {
+    console.log('[Tickets] POST /public hit. Body:', req.body);
     const { subject, description, category, priority, name, email, clientId, userId } = req.body;
     
     let attachments = [];

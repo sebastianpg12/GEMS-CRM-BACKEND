@@ -20,8 +20,16 @@ function getTransporter() {
 
 // ─── Core helper ─────────────────────────────────────────────────────────────
 async function sendMail({ to, subject, html, text }) {
-  if (!process.env.SMTP_HOST || !process.env.SMTP_USER) {
-    console.warn('[Email] SMTP not configured – skipping notification to', to);
+  const host = process.env.SMTP_HOST;
+  const user = process.env.SMTP_USER;
+  const pass = process.env.SMTP_PASS;
+
+  if (!host || !user || !pass) {
+    console.warn('[Email] Skipping: Missing config:', { 
+      host: host ? 'OK' : 'MISSING', 
+      user: user ? 'OK' : 'MISSING', 
+      pass: pass ? 'OK' : 'MISSING' 
+    });
     return null;
   }
   try {
