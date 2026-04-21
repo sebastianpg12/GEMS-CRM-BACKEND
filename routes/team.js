@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const User = require('../models/User'); // Cambiado de Team a User
+const Role = require('../models/Role');
 const Setting = require('../models/Setting');
 const { authenticateToken, requireRole } = require('../middleware/auth');
 
@@ -91,6 +92,14 @@ router.post('/', checkTeamPermissions('create'), async (req, res) => {
     // Asignar contraseña por defecto si no se proporciona
     const defaultPassword = password || 'gems12-';
 
+    let permissions = req.body.permissions;
+    if (!permissions) {
+      const foundRole = await Role.findOne({ name: role });
+      if (foundRole) {
+        permissions = foundRole.permissions;
+      }
+    }
+
     const member = new User({
       name,
       email,
@@ -99,6 +108,7 @@ router.post('/', checkTeamPermissions('create'), async (req, res) => {
       department,
       position,
       phone,
+      ...(permissions && { permissions }),
       isActive: true
     });
     
@@ -233,6 +243,13 @@ router.put('/:id', checkTeamPermissions('edit'), async (req, res) => {
         success: false, 
         message: 'No puedes modificar tu propio usuario' 
       });
+    }
+
+    if (updateData.role && !updateData.permissions) {
+      const foundRole = await Role.findOne({ name: updateData.role });
+      if (foundRole) {
+        updateData.permissions = foundRole.permissions;
+      }
     }
 
     const member = await User.findByIdAndUpdate(

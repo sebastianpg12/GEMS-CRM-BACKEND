@@ -22,7 +22,6 @@ const userSchema = new mongoose.Schema({
     role: {
     type: String,
     required: true,
-    enum: ['admin', 'manager', 'employee', 'support', 'development', 'fullstack', 'client', 'viewer'],
     default: 'employee'
   },
   avatar: {
@@ -112,82 +111,7 @@ userSchema.methods.comparePassword = async function(candidatePassword) {
   return await bcrypt.compare(candidatePassword, this.password);
 };
 
-// Set default permissions based on role
-userSchema.pre('save', function(next) {
-  if (!this.isModified('role')) return next();
-  
-  switch (this.role) {
-    case 'admin':
-      this.permissions = {
-        dashboard: true,
-        clients: { view: true, create: true, edit: true, delete: true },
-        activities: { view: true, create: true, edit: true, delete: true },
-        reports: { view: true, export: true },
-        accounting: { view: true, create: true, edit: true, delete: true },
-        cases: { view: true, create: true, edit: true, delete: true },
-        team: { view: true, create: true, edit: true, delete: true }
-      };
-      break;
-    case 'manager':
-      this.permissions = {
-        dashboard: true,
-        clients: { view: true, create: true, edit: true, delete: false },
-        activities: { view: true, create: true, edit: true, delete: false },
-        reports: { view: true, export: true },
-        accounting: { view: true, create: true, edit: true, delete: false },
-        cases: { view: true, create: true, edit: true, delete: false },
-        team: { view: true, create: true, edit: true, delete: false }
-      };
-      break;
-    case 'employee':
-      this.permissions = {
-        dashboard: true,
-        clients: { view: false, create: false, edit: false, delete: false }, // Empleado NO puede ver clientes
-        activities: { view: true, create: true, edit: true, delete: true }, // Empleado acceso completo a actividades
-        reports: { view: false, export: false },
-        accounting: { view: false, create: false, edit: false, delete: false },
-        cases: { view: true, create: false, edit: false, delete: false }, // Empleado solo puede VER casos
-        team: { view: true, create: false, edit: false, delete: false } // Empleado solo puede VER equipo
-      };
-      break;
-    case 'support':
-    case 'development':
-    case 'fullstack':
-      this.permissions = {
-        dashboard: true,
-        clients: { view: false, create: false, edit: false, delete: false },
-        activities: { view: true, create: true, edit: true, delete: true },
-        reports: { view: false, export: false },
-        accounting: { view: false, create: false, edit: false, delete: false },
-        cases: { view: true, create: true, edit: true, delete: true },
-        team: { view: true, create: false, edit: false, delete: false }
-      };
-      break;
-    case 'client':
-      this.permissions = {
-        dashboard: false,
-        clients: { view: false, create: false, edit: false, delete: false },
-        activities: { view: false, create: false, edit: false, delete: false },
-        reports: { view: false, export: false },
-        accounting: { view: false, create: false, edit: false, delete: false },
-        cases: { view: false, create: false, edit: false, delete: false },
-        team: { view: false, create: false, edit: false, delete: false }
-      };
-      break;
-    case 'viewer':
-      this.permissions = {
-        dashboard: true,
-        clients: { view: true, create: false, edit: false, delete: false },
-        activities: { view: true, create: false, edit: false, delete: false },
-        reports: { view: false, export: false },
-        accounting: { view: false, create: false, edit: false, delete: false },
-        cases: { view: true, create: false, edit: false, delete: false },
-        team: { view: false, create: false, edit: false, delete: false }
-      };
-      break;
-  }
-  next();
-});
+// Removed old hardcoded permissions switch case.
 
 // Remove password from JSON output
 userSchema.methods.toJSON = function() {

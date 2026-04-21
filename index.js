@@ -82,6 +82,7 @@ const tasksRoutes = require('./routes/tasks');
 const boardsRoutes = require('./routes/boards');
 const githubRoutes = require('./routes/github');
 const ticketsRoutes = require('./routes/tickets');
+const rolesRoutes = require('./routes/roles');
 
 // Usar rutas
 app.use('/api/auth', authRoutes);
@@ -106,6 +107,7 @@ app.use('/api/tasks', tasksRoutes);
 app.use('/api/boards', boardsRoutes);
 app.use('/api/github', githubRoutes);
 app.use('/api/tickets', ticketsRoutes);
+app.use('/api/roles', rolesRoutes);
 
 // TEMPORARY: Route to setup test client user
 app.get('/api/setup-client-test', async (req, res) => {
@@ -147,8 +149,9 @@ db.once('open', async () => {
   console.log('Connected to MongoDB');
   
   // ─── One-time initialization ───
-  const { ensureSupportUser } = require('./services/initService');
+  const { ensureSupportUser, ensureDefaultRoles } = require('./services/initService');
   await ensureSupportUser();
+  await ensureDefaultRoles();
 
   // Inicializar el servicio de cron para reportes de tareas
   const { initTaskReportsCron } = require('./services/cronService');
