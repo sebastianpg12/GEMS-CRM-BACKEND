@@ -17,9 +17,12 @@ const checkTeamPermissions = (action) => {
   return (req, res, next) => {
     const user = req.user;
     console.log('🔐 Checking team permissions for:', user.email);
-    console.log('👤 User role:', user.role);
-    console.log('📋 User permissions:', JSON.stringify(user.permissions, null, 2));
-    console.log('🎯 Required action:', action);
+    
+    // Admin always has full access
+    if (user.role === 'admin') {
+      console.log('👑 Admin access granted');
+      return next();
+    }
     
     // Por ahora, permitir a todos los usuarios autenticados ver el equipo para debugging
     if (action === 'view') {
@@ -397,6 +400,40 @@ router.put('/:id/activate', checkTeamPermissions('edit'), async (req, res) => {
     res.status(500).json({ 
       success: false, 
       message: 'Error al reactivar miembro del equipo', 
+      error: error.message 
+    });
+  }
+});
+
+// Eliminar permanentemente (solo admin)
+router.delete('/:id/permanent', requireRole('admin'), async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    if (id === req.user._id.toString()) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'No puedes eliminar permanentemente tu propio usuario' 
+      });
+    }
+
+    const member = await User.findByIdAndDelete(id);
+    
+    if (!member) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Miembro del equipo no encontrado' 
+      });
+    }
+    
+    res.json({ 
+      success: true, 
+      message: 'Miembro del equipo eliminado permanentemente de la base de datos'
+    });
+  } catch (error) {
+    res.status(500).json({ 
+      success: false, 
+      message: 'Error al eliminar permanentemente al miembro', 
       error: error.message 
     });
   }
