@@ -55,32 +55,32 @@ router.post('/send-daily-email', async (req, res) => {
     `;
     
     if (tasks.length === 0) {
-      html += \`<tr><td colspan="4" style="padding: 20px; text-align: center;">No hay actividad registrada el día de hoy.</td></tr>\`;
+      html += `<tr><td colspan="4" style="padding: 20px; text-align: center;">No hay actividad registrada el día de hoy.</td></tr>`;
     } else {
       tasks.forEach(task => {
         const assignedNames = task.assignedTo && task.assignedTo.length > 0 
           ? task.assignedTo.map(u => u.name).join(', ') 
           : 'Sin asignar';
           
-        html += \`
+        html += `
           <tr>
-            <td style="padding: 10px; border-bottom: 1px solid #e5e7eb;"><strong>\${task.title}</strong><br><span style="font-size: 12px; color: #6b7280;">Horas reportadas: \${task.actualHours || 0}</span></td>
-            <td style="padding: 10px; border-bottom: 1px solid #e5e7eb;">\${assignedNames}</td>
+            <td style="padding: 10px; border-bottom: 1px solid #e5e7eb;"><strong>${task.title}</strong><br><span style="font-size: 12px; color: #6b7280;">Horas reportadas: ${task.actualHours || 0}</span></td>
+            <td style="padding: 10px; border-bottom: 1px solid #e5e7eb;">${assignedNames}</td>
             <td style="padding: 10px; border-bottom: 1px solid #e5e7eb;">
-              <span style="background-color: #e0e7ff; color: #4338ca; padding: 4px 8px; border-radius: 4px; font-size: 12px;">\${task.boardStatus}</span>
+              <span style="background-color: #e0e7ff; color: #4338ca; padding: 4px 8px; border-radius: 4px; font-size: 12px;">${task.boardStatus}</span>
             </td>
-            <td style="padding: 10px; border-bottom: 1px solid #e5e7eb;">\${task.completionPercentage || 0}%</td>
+            <td style="padding: 10px; border-bottom: 1px solid #e5e7eb;">${task.completionPercentage || 0}%</td>
           </tr>
-        \`;
+        `;
       });
     }
     
-    html += \`
+    html += `
           </tbody>
         </table>
-        <p style="margin-top: 20px; font-size: 12px; color: #9ca3af;">Generado automáticamente desde GEMS CRM.</p>
+        <p style="margin-top: 20px; font-size: 12px; color: #9ca3af;">Generado automáticamente desde Customer Touch.</p>
       </div>
-    \`;
+    `;
     
     // Si no se envía a quién, enviarlo a un fallback o error
     const emailTo = toEmail || process.env.SUPPORT_EMAIL;
@@ -91,7 +91,7 @@ router.post('/send-daily-email', async (req, res) => {
     
     const info = await sendMail({
       to: emailTo,
-      subject: \`Resumen Diario Scrum - \${new Date().toLocaleDateString('es-ES')}\`,
+      subject: `Resumen Diario Scrum - ${new Date().toLocaleDateString('es-ES')}`,
       html
     });
     
@@ -99,7 +99,7 @@ router.post('/send-daily-email', async (req, res) => {
       return res.status(500).json({ error: 'Error al enviar el correo. Revisa la configuración SMTP.' });
     }
     
-    res.json({ success: true, message: \`Reporte enviado exitosamente a \${emailTo}\` });
+    res.json({ success: true, message: `Reporte enviado exitosamente a ${emailTo}` });
   } catch (error) {
     console.error('Error al enviar reporte diario por email:', error);
     res.status(500).json({ error: error.message });
