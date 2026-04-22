@@ -70,6 +70,8 @@ router.get('/', checkTeamPermissions('view'), async (req, res) => {
         avatar: user.avatar,
         photo: user.photo,
         department: user.department,
+        departmentRole: user.departmentRole,
+        supervisor: user.supervisor,
         position: user.position,
         phone: user.phone,
         isActive: user.isActive,
@@ -96,7 +98,7 @@ router.get('/', checkTeamPermissions('view'), async (req, res) => {
 // Crear nuevo miembro del equipo (usuario)
 router.post('/', checkTeamPermissions('create'), async (req, res) => {
   try {
-    const { name, email, password, role, department, position, phone } = req.body;
+    const { name, email, password, role, department, departmentRole, supervisor, position, phone } = req.body;
     
     // Verificar que el email no exista
     const existingUser = await User.findOne({ email });
@@ -132,6 +134,8 @@ router.post('/', checkTeamPermissions('create'), async (req, res) => {
       password: defaultPassword,
       role: role || 'employee',
       department,
+      departmentRole: departmentRole || 'member',
+      supervisor: supervisor || null,
       position,
       phone,
       ...(permissions && { permissions }),

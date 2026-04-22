@@ -44,6 +44,16 @@ const userSchema = new mongoose.Schema({
     type: String,
     default: null
   },
+  departmentRole: {
+    type: String,
+    enum: ['member', 'leader'],
+    default: 'member'
+  },
+  supervisor: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    default: null
+  },
   isActive: {
     type: Boolean,
     default: true
