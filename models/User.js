@@ -105,6 +105,11 @@ const userSchema = new mongoose.Schema({
 
 // Hash password before saving
 userSchema.pre('save', async function(next) {
+  // Sanitize supervisor
+  if (this.supervisor === '') {
+    this.supervisor = null;
+  }
+
   if (!this.isModified('password')) return next();
   
   try {
@@ -114,6 +119,23 @@ userSchema.pre('save', async function(next) {
   } catch (error) {
     next(error);
   }
+});
+
+// Sanitize supervisor on update
+userSchema.pre('findOneAndUpdate', function(next) {
+  const update = this.getUpdate();
+  if (update.supervisor === '') {
+    update.supervisor = null;
+  }
+  next();
+});
+
+userSchema.pre('updateMany', function(next) {
+  const update = this.getUpdate();
+  if (update.supervisor === '') {
+    update.supervisor = null;
+  }
+  next();
 });
 
 // Compare password method
