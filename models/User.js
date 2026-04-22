@@ -122,19 +122,17 @@ userSchema.pre('save', async function(next) {
 });
 
 // Sanitize supervisor on update
-userSchema.pre('findOneAndUpdate', function(next) {
+userSchema.pre(['findOneAndUpdate', 'updateMany', 'updateOne'], function(next) {
   const update = this.getUpdate();
+  
   if (update.supervisor === '') {
     update.supervisor = null;
   }
-  next();
-});
-
-userSchema.pre('updateMany', function(next) {
-  const update = this.getUpdate();
-  if (update.supervisor === '') {
-    update.supervisor = null;
+  
+  if (update.$set && update.$set.supervisor === '') {
+    update.$set.supervisor = null;
   }
+  
   next();
 });
 
