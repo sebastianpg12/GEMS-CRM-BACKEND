@@ -19,6 +19,12 @@ const ActivitySchema = new mongoose.Schema({
   dueDate: { type: Date },
   estimatedTime: { type: String }, // Ej: "2 horas", "30 minutos"
   taskId: { type: String }, // ✅ ID de la tarea del board asociada (para sincronización)
+  completionPercentage: { type: Number, default: 0, min: 0, max: 100 },
+  timeSpent: { type: Number, default: 0 }, // En segundos
+  activeSessions: [{
+    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    startTime: { type: Date, default: Date.now }
+  }],
   createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }, // Quien creó la actividad
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now }

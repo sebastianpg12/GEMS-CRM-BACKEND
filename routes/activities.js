@@ -302,6 +302,67 @@ router.patch('/:id/assign', async (req, res) => {
   }
 });
 
+// Actualizar progreso
+router.patch('/:id/progress', async (req, res) => {
+  try {
+    const { completionPercentage } = req.body;
+    const activity = await Activity.findByIdAndUpdate(
+      req.params.id,
+      { completionPercentage, updatedAt: new Date() },
+      { new: true }
+    )
+      .populate('clientId', 'name email company')
+      .populate('assignedTo', 'name email role photo avatar')
+      .populate('createdBy', 'name email');
+    
+    if (!activity) return res.status(404).json({ error: 'Actividad no encontrada' });
+    res.json(activity);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// Toggle Timer
+router.post('/:id/timer', async (req, res) => {
+  try {
+    const { action, userId, minutes } = req.body; // action: 'start' | 'stop' | 'add_manual'
+    const activity = await Activity.findById(req.params.id);
+    if (!activity) return res.status(404).json({ error: 'Actividad no encontrada' });
+
+    if (!activity.activeSessions) activity.activeSessions = [];
+
+    if (action === 'start') {
+      const isActive = activity.activeSessions.some(s => s.userId.toString() === userId);
+      if (!isActive) {
+        activity.activeSessions.push({ userId, startTime: new Date() });
+      }
+    } else if (action === 'stop') {
+      const sessionIndex = activity.activeSessions.findIndex(s => s.userId.toString() === userId);
+      if (sessionIndex > -1) {
+        const session = activity.activeSessions[sessionIndex];
+        const elapsedSeconds = Math.floor((new Date() - session.startTime) / 1000);
+        activity.timeSpent = (activity.timeSpent || 0) + elapsedSeconds;
+        activity.activeSessions.splice(sessionIndex, 1);
+      }
+    } else if (action === 'add_manual') {
+      if (minutes && !isNaN(minutes)) {
+        activity.timeSpent = (activity.timeSpent || 0) + (parseInt(minutes) * 60);
+      }
+    }
+    
+    await activity.save();
+    
+    const updatedActivity = await Activity.findById(activity._id)
+      .populate('clientId', 'name email company')
+      .populate('assignedTo', 'name email role photo avatar')
+      .populate('createdBy', 'name email');
+      
+    res.json(updatedActivity);
+  } catch (error) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
 // Eliminar actividad
 router.delete('/:id', async (req, res) => {
   try {
