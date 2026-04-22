@@ -46,8 +46,8 @@ async function ensureDefaultRoles() {
       }
     },
     {
-      name: 'Manager',
-      description: 'Gestión de equipos y clientes, sin eliminar',
+      name: 'Gerencia',
+      description: 'Gestión de equipos y clientes, sin capacidades de borrado directivo',
       isSystem: true,
       permissions: {
         dashboard: true,
@@ -60,8 +60,8 @@ async function ensureDefaultRoles() {
       }
     },
     {
-      name: 'Vendedor',
-      description: 'Gestión de ventas y prospectos',
+      name: 'Ejecutivo Comercial',
+      description: 'Gestión de ventas y relación con prospectos',
       isSystem: true,
       permissions: {
         dashboard: true,
@@ -74,8 +74,8 @@ async function ensureDefaultRoles() {
       }
     },
     {
-      name: 'Soporte',
-      description: 'Resolución de casos y tickets',
+      name: 'Soporte Técnico',
+      description: 'Gestión y resolución de incidencias técnicas',
       isSystem: true,
       permissions: {
         dashboard: true,

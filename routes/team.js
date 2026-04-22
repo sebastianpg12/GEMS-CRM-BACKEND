@@ -3,6 +3,10 @@ const router = express.Router();
 const User = require('../models/User'); // Cambiado de Team a User
 const Role = require('../models/Role');
 const Setting = require('../models/Setting');
+const Task = require('../models/Task');
+const Activity = require('../models/Activity');
+const Case = require('../models/Case');
+const Ticket = require('../models/Ticket');
 const { authenticateToken, requireRole } = require('../middleware/auth');
 
 // Middleware de autenticación para todas las rutas
@@ -36,10 +40,23 @@ const checkTeamPermissions = (action) => {
   };
 };
 
-// Obtener todos los miembros del equipo (usuarios)
+// Obtener todos los miembros del equipo (usuarios) con paginación
 router.get('/', checkTeamPermissions('view'), async (req, res) => {
   try {
-    const team = await User.find({ isActive: true }).select('-password');
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 12;
+    const skip = (page - 1) * limit;
+
+    // Filtros opcionales
+    const query = { isActive: true };
+    
+    const total = await User.countDocuments(query);
+    const team = await User.find(query)
+      .select('-password')
+      .skip(skip)
+      .limit(limit)
+      .sort({ createdAt: -1 });
+
     res.json({ 
       success: true, 
       data: team.map(user => ({
@@ -56,7 +73,13 @@ router.get('/', checkTeamPermissions('view'), async (req, res) => {
         lastLogin: user.lastLogin,
         createdAt: user.createdAt,
         updatedAt: user.updatedAt
-      }))
+      })),
+      pagination: {
+        total,
+        page,
+        limit,
+        pages: Math.ceil(total / limit)
+      }
     });
   } catch (error) {
     res.status(500).json({ 
@@ -292,6 +315,34 @@ router.delete('/:id', checkTeamPermissions('delete'), async (req, res) => {
       });
     }
 
+    // Realizar la reasignación de tareas y casos antes de desactivar
+    // Esto asegura que el trabajo no quede huérfano y se mantengan las métricas
+    
+    // 1. Reasignar Casos y Tickets (Asignación única)
+    await Case.updateMany({ asignado_a: id }, { asignado_a: req.user._id });
+    await Ticket.updateMany({ assignedTo: id }, { assignedTo: req.user._id });
+
+    // 2. Reasignar Tareas (Asignación múltiple)
+    // Quitamos al usuario de todas las tareas. Si era el único, asignamos al admin.
+    const tasksToReassign = await Task.find({ assignedTo: id });
+    for (const task of tasksToReassign) {
+      task.assignedTo = task.assignedTo.filter(uid => uid.toString() !== id);
+      if (task.assignedTo.length === 0) {
+        task.assignedTo.push(req.user._id);
+      }
+      await task.save();
+    }
+
+    // 3. Reasignar Actividades (Asignación múltiple)
+    const activitiesToReassign = await Activity.find({ assignedTo: id });
+    for (const activity of activitiesToReassign) {
+      activity.assignedTo = activity.assignedTo.filter(uid => uid.toString() !== id);
+      if (activity.assignedTo.length === 0) {
+        activity.assignedTo.push(req.user._id);
+      }
+      await activity.save();
+    }
+
     const member = await User.findByIdAndUpdate(
       id, 
       { isActive: false }, 
@@ -307,7 +358,7 @@ router.delete('/:id', checkTeamPermissions('delete'), async (req, res) => {
     
     res.json({ 
       success: true, 
-      message: 'Miembro del equipo desactivado exitosamente',
+      message: 'Miembro del equipo desactivado y sus responsabilidades han sido reasignadas exitosamente',
       data: member
     });
   } catch (error) {

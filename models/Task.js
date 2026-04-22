@@ -110,6 +110,21 @@ const TaskSchema = new mongoose.Schema({
     max: 100
   },
   
+  // Sesiones de tiempo en vivo (Timer activo)
+  activeSessions: [{
+    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    startTime: { type: Date, default: Date.now }
+  }],
+  
+  // Registro histórico de tiempos
+  timeLogs: [{
+    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    startTime: Date,
+    endTime: Date,
+    durationHours: Number,
+    notes: String
+  }],
+  
   // Fechas
   startDate: { 
     type: Date,
@@ -254,8 +269,8 @@ TaskSchema.pre('save', function(next) {
     this.remainingHours = Math.max(0, this.estimatedHours - this.actualHours);
   }
   
-  // Calcular porcentaje de completitud basado en horas
-  if (this.estimatedHours > 0) {
+  // Calcular porcentaje de completitud basado en horas (solo si no se ingresó manualmente)
+  if (this.isModified('actualHours') && !this.isModified('completionPercentage') && this.estimatedHours > 0) {
     this.completionPercentage = Math.min(100, Math.round((this.actualHours / this.estimatedHours) * 100));
   }
   

@@ -10,6 +10,102 @@ const {
 } = require('../services/taskReportService');
 
 // Endpoint para obtener la configuración actual de los reportes
+const { sendMail } = require('../services/emailService');
+const Task = require('../models/Task');
+const User = require('../models/User');
+
+// Endpoint para enviar reporte diario por email (Scrum Daily)
+router.post('/send-daily-email', async (req, res) => {
+  try {
+    const { department, toEmail } = req.body;
+    
+    // Obtener tareas modificadas hoy o con activeSessions/timeLogs
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    let filter = {
+      updatedAt: { $gte: today }
+    };
+    
+    if (department) {
+      const usersInDept = await User.find({ department }).select('_id');
+      const userIds = usersInDept.map(u => u._id);
+      filter.assignedTo = { $in: userIds };
+    }
+    
+    const tasks = await Task.find(filter)
+      .populate('assignedTo', 'name email department')
+      .sort({ updatedAt: -1 });
+      
+    // Generar HTML del correo
+    let html = `
+      <div style="font-family: Arial, sans-serif; max-width: 800px; margin: auto; padding: 20px;">
+        <h2 style="color: #4f46e5;">Reporte Diario Scrum ${department ? `- Departamento: ${department}` : ''}</h2>
+        <p>Resumen de tareas actualizadas o trabajadas hoy (${new Date().toLocaleDateString('es-ES')}):</p>
+        <table style="width: 100%; border-collapse: collapse; margin-top: 20px;">
+          <thead>
+            <tr style="background-color: #f3f4f6; text-align: left;">
+              <th style="padding: 10px; border-bottom: 2px solid #e5e7eb;">Tarea</th>
+              <th style="padding: 10px; border-bottom: 2px solid #e5e7eb;">Asignado a</th>
+              <th style="padding: 10px; border-bottom: 2px solid #e5e7eb;">Estado Kanban</th>
+              <th style="padding: 10px; border-bottom: 2px solid #e5e7eb;">Progreso</th>
+            </tr>
+          </thead>
+          <tbody>
+    `;
+    
+    if (tasks.length === 0) {
+      html += \`<tr><td colspan="4" style="padding: 20px; text-align: center;">No hay actividad registrada el día de hoy.</td></tr>\`;
+    } else {
+      tasks.forEach(task => {
+        const assignedNames = task.assignedTo && task.assignedTo.length > 0 
+          ? task.assignedTo.map(u => u.name).join(', ') 
+          : 'Sin asignar';
+          
+        html += \`
+          <tr>
+            <td style="padding: 10px; border-bottom: 1px solid #e5e7eb;"><strong>\${task.title}</strong><br><span style="font-size: 12px; color: #6b7280;">Horas reportadas: \${task.actualHours || 0}</span></td>
+            <td style="padding: 10px; border-bottom: 1px solid #e5e7eb;">\${assignedNames}</td>
+            <td style="padding: 10px; border-bottom: 1px solid #e5e7eb;">
+              <span style="background-color: #e0e7ff; color: #4338ca; padding: 4px 8px; border-radius: 4px; font-size: 12px;">\${task.boardStatus}</span>
+            </td>
+            <td style="padding: 10px; border-bottom: 1px solid #e5e7eb;">\${task.completionPercentage || 0}%</td>
+          </tr>
+        \`;
+      });
+    }
+    
+    html += \`
+          </tbody>
+        </table>
+        <p style="margin-top: 20px; font-size: 12px; color: #9ca3af;">Generado automáticamente desde GEMS CRM.</p>
+      </div>
+    \`;
+    
+    // Si no se envía a quién, enviarlo a un fallback o error
+    const emailTo = toEmail || process.env.SUPPORT_EMAIL;
+    
+    if (!emailTo) {
+      return res.status(400).json({ error: 'No se pudo determinar el destinatario del correo (toEmail es requerido).' });
+    }
+    
+    const info = await sendMail({
+      to: emailTo,
+      subject: \`Resumen Diario Scrum - \${new Date().toLocaleDateString('es-ES')}\`,
+      html
+    });
+    
+    if (!info) {
+      return res.status(500).json({ error: 'Error al enviar el correo. Revisa la configuración SMTP.' });
+    }
+    
+    res.json({ success: true, message: \`Reporte enviado exitosamente a \${emailTo}\` });
+  } catch (error) {
+    console.error('Error al enviar reporte diario por email:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 router.get('/settings', async (req, res) => {
   try {
     let settings = await Setting.findOne({ key: 'taskReports' });

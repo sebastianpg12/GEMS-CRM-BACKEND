@@ -20,7 +20,8 @@ router.get('/', async (req, res) => {
       sprint,
       type,
       tags,
-      board
+      board,
+      department
     } = req.query;
     
     let filter = {};
@@ -37,12 +38,32 @@ router.get('/', async (req, res) => {
     if (sprint) filter['sprint.id'] = sprint;
     if (type) filter.type = type;
     if (tags) filter.tags = { $in: tags.split(',') };
+
+    // Filtro por departamento del usuario asignado
+    if (department) {
+      const User = require('../models/User');
+      const usersInDept = await User.find({ department }).select('_id');
+      const userIds = usersInDept.map(u => u._id);
+      
+      if (filter.assignedTo) {
+        // Si ya hay un assignedTo, cruzamos (esto es raro pero por si acaso)
+        if (userIds.some(id => id.toString() === filter.assignedTo.toString())) {
+          filter.assignedTo = filter.assignedTo;
+        } else {
+          // No coincide con el departamento, devolvemos nada
+          filter.assignedTo = null;
+        }
+      } else {
+        filter.assignedTo = { $in: userIds };
+      }
+    }
     
     const tasks = await Task.find(filter)
-      .populate('assignedTo', 'name email photo role')
+      .populate('assignedTo', 'name email photo role department')
       .populate('createdBy', 'name email photo')
       .populate('parentTask', 'title type status')
       .populate('blockedBy', 'title status')
+      .populate('activeSessions.userId', 'name email photo')
       .sort({ priority: -1, updatedAt: -1 });
     
     res.json(tasks);
@@ -94,13 +115,15 @@ router.get('/my-tasks', async (req, res) => {
 router.get('/:id', async (req, res) => {
   try {
     const task = await Task.findById(req.params.id)
-      .populate('assignedTo', 'name email photo role')
+      .populate('assignedTo', 'name email photo role department')
       .populate('createdBy', 'name email photo')
       .populate('parentTask', 'title type status')
       .populate('blockedBy', 'title status')
       .populate('relatedTasks', 'title type status')
       .populate('comments.userId', 'name email photo')
-      .populate('attachments.uploadedBy', 'name email photo');
+      .populate('attachments.uploadedBy', 'name email photo')
+      .populate('activeSessions.userId', 'name email photo')
+      .populate('timeLogs.userId', 'name email photo');
     
     if (!task) {
       return res.status(404).json({ error: 'Tarea no encontrada' });
@@ -267,6 +290,91 @@ router.patch('/:id/github', async (req, res) => {
     res.json(task);
   } catch (error) {
     res.status(400).json({ error: error.message });
+  }
+});
+
+// ==================== TIME TRACKING (TIMER) ====================
+
+// Iniciar temporizador
+router.post('/:id/timer/start', async (req, res) => {
+  try {
+    const userId = req.user.id || req.user._id;
+    const task = await Task.findById(req.params.id);
+    
+    if (!task) {
+      return res.status(404).json({ error: 'Tarea no encontrada' });
+    }
+    
+    // Verificar si ya tiene una sesión activa
+    const hasActiveSession = task.activeSessions.some(session => session.userId.toString() === userId.toString());
+    if (hasActiveSession) {
+      return res.status(400).json({ error: 'Ya tienes un temporizador activo para esta tarea' });
+    }
+    
+    task.activeSessions.push({
+      userId,
+      startTime: new Date()
+    });
+    
+    await task.save();
+    
+    // Devolvemos la tarea con datos populados
+    await task.populate('activeSessions.userId', 'name email photo');
+    
+    res.json(task);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Detener temporizador
+router.post('/:id/timer/stop', async (req, res) => {
+  try {
+    const userId = req.user.id || req.user._id;
+    const task = await Task.findById(req.params.id);
+    
+    if (!task) {
+      return res.status(404).json({ error: 'Tarea no encontrada' });
+    }
+    
+    // Buscar la sesión activa del usuario
+    const sessionIndex = task.activeSessions.findIndex(session => session.userId.toString() === userId.toString());
+    
+    if (sessionIndex === -1) {
+      return res.status(400).json({ error: 'No hay temporizador activo para esta tarea' });
+    }
+    
+    const session = task.activeSessions[sessionIndex];
+    const endTime = new Date();
+    
+    // Calcular duración en horas
+    const durationMs = endTime.getTime() - session.startTime.getTime();
+    const durationHours = durationMs / (1000 * 60 * 60);
+    
+    // Remover sesión activa
+    task.activeSessions.splice(sessionIndex, 1);
+    
+    // Agregar al log de tiempos
+    task.timeLogs.push({
+      userId,
+      startTime: session.startTime,
+      endTime,
+      durationHours,
+      notes: req.body.notes || ''
+    });
+    
+    // Actualizar horas actuales
+    task.actualHours = (task.actualHours || 0) + durationHours;
+    
+    // El middleware pre('save') se encargará de recalcular remainingHours y completionPercentage
+    await task.save();
+    
+    await task.populate('activeSessions.userId', 'name email photo');
+    await task.populate('timeLogs.userId', 'name email photo');
+    
+    res.json(task);
+  } catch (error) {
+    res.status(500).json({ error: error.message });
   }
 });
 

@@ -158,25 +158,37 @@ router.post('/public', upload.array('files', 5), async (req, res) => {
 
 // --- AUTHENTICATED ROUTES ---
 
-// Get all tickets (Admin/Manager/Support)
+// Get all tickets (Admin/Manager/Support) with pagination
 router.get('/', authenticateToken, async (req, res) => {
   try {
     const { status, priority, category } = req.query;
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 15;
+    const skip = (page - 1) * limit;
+
     let query = {};
-    
     if (status) query.status = status;
     if (priority) query.priority = priority;
     if (category) query.category = category;
 
-    // Support role might only see assigned or new? 
-    // For now, let's allow support to see all to have context of unassigned ones.
-    
+    const total = await Ticket.countDocuments(query);
     const tickets = await Ticket.find(query)
       .populate('assignedTo', 'name email avatar photo')
       .populate('submittedBy.userId', 'name email avatar')
-      .sort({ createdAt: -1 });
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(limit);
 
-    res.json({ success: true, data: tickets });
+    res.json({ 
+      success: true, 
+      data: tickets,
+      pagination: {
+        total,
+        page,
+        limit,
+        pages: Math.ceil(total / limit)
+      }
+    });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
@@ -196,23 +208,39 @@ router.get('/my', authenticateToken, async (req, res) => {
   }
 });
 
-// Get my ticket history (Client view)
+// Get my ticket history (Client view) with pagination
 router.get('/client-history', authenticateToken, async (req, res) => {
   try {
     const userId = req.user._id;
     const email = req.user.email;
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 12;
+    const skip = (page - 1) * limit;
     
-    // Find tickets submitted by this user (either by ID if associated or by email)
-    const tickets = await Ticket.find({
+    const query = {
       $or: [
         { 'submittedBy.userId': userId },
         { 'submittedBy.email': email }
       ]
-    })
-    .populate('assignedTo', 'name email avatar position')
-    .sort({ createdAt: -1 });
+    };
 
-    res.json({ success: true, data: tickets });
+    const total = await Ticket.countDocuments(query);
+    const tickets = await Ticket.find(query)
+    .populate('assignedTo', 'name email avatar position')
+    .sort({ createdAt: -1 })
+    .skip(skip)
+    .limit(limit);
+
+    res.json({ 
+      success: true, 
+      data: tickets,
+      pagination: {
+        total,
+        page,
+        limit,
+        pages: Math.ceil(total / limit)
+      }
+    });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
