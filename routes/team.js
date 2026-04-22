@@ -305,6 +305,41 @@ router.put('/:id', checkTeamPermissions('edit'), async (req, res) => {
   }
 });
 
+// Eliminar permanentemente (solo admin)
+// COLOCADA ANTES de /:id para evitar que sea capturada por la ruta de soft delete
+router.delete('/:id/permanent', requireRole('admin'), async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    if (id === req.user._id.toString()) {
+      return res.status(400).json({ 
+        success: false, 
+        message: 'No puedes eliminar permanentemente tu propio usuario' 
+      });
+    }
+
+    const member = await User.findByIdAndDelete(id);
+    
+    if (!member) {
+      return res.status(404).json({ 
+        success: false, 
+        message: 'Miembro del equipo no encontrado' 
+      });
+    }
+    
+    res.json({ 
+      success: true, 
+      message: 'Miembro del equipo eliminado permanentemente de la base de datos'
+    });
+  } catch (error) {
+    res.status(500).json({ 
+      success: false, 
+      message: 'Error al eliminar permanentemente al miembro', 
+      error: error.message 
+    });
+  }
+});
+
 // Desactivar miembro del equipo (soft delete)
 router.delete('/:id', checkTeamPermissions('delete'), async (req, res) => {
   try {
@@ -405,38 +440,5 @@ router.put('/:id/activate', checkTeamPermissions('edit'), async (req, res) => {
   }
 });
 
-// Eliminar permanentemente (solo admin)
-router.delete('/:id/permanent', requireRole('admin'), async (req, res) => {
-  try {
-    const { id } = req.params;
-    
-    if (id === req.user._id.toString()) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'No puedes eliminar permanentemente tu propio usuario' 
-      });
-    }
-
-    const member = await User.findByIdAndDelete(id);
-    
-    if (!member) {
-      return res.status(404).json({ 
-        success: false, 
-        message: 'Miembro del equipo no encontrado' 
-      });
-    }
-    
-    res.json({ 
-      success: true, 
-      message: 'Miembro del equipo eliminado permanentemente de la base de datos'
-    });
-  } catch (error) {
-    res.status(500).json({ 
-      success: false, 
-      message: 'Error al eliminar permanentemente al miembro', 
-      error: error.message 
-    });
-  }
-});
 
 module.exports = router;
