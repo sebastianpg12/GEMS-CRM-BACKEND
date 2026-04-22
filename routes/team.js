@@ -135,7 +135,7 @@ router.post('/', checkTeamPermissions('create'), async (req, res) => {
       role: role || 'employee',
       department,
       departmentRole: departmentRole || 'member',
-      supervisor: supervisor || null,
+      supervisor: (supervisor && supervisor !== '') ? supervisor : null,
       position,
       phone,
       ...(permissions && { permissions }),
@@ -258,6 +258,11 @@ router.put('/:id', checkTeamPermissions('edit'), async (req, res) => {
     
     // No permitir cambiar la contraseña a través de esta ruta
     delete updateData.password;
+
+    // Sanitizar supervisor (convertir string vacío a null para evitar errores de Mongoose)
+    if (updateData.supervisor === '') {
+      updateData.supervisor = null;
+    }
     
     // Solo admin puede cambiar roles de admin
     if (updateData.role === 'admin' && req.user.role !== 'admin') {
