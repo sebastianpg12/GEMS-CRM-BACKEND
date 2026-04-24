@@ -392,7 +392,14 @@ router.get('/team/performance', async (req, res) => {
       {
         // Convertir assignedTo a ObjectId si es string para asegurar el lookup
         $addFields: {
-          assignedToObj: { $toObjectId: "$assignedTo" }
+          assignedToObj: {
+            $convert: {
+              input: "$assignedTo",
+              to: "objectId",
+              onError: "$assignedTo", // Si falla, mantener el original (evita crash)
+              onNull: null
+            }
+          }
         }
       },
       {
@@ -448,7 +455,14 @@ router.get('/team/performance', async (req, res) => {
       },
       {
         $addFields: {
-          assignedToObj: { $toObjectId: "$assignedTo" }
+          assignedToObj: {
+            $convert: {
+              input: "$assignedTo",
+              to: "objectId",
+              onError: "$assignedTo",
+              onNull: null
+            }
+          }
         }
       },
       {
