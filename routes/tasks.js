@@ -218,10 +218,31 @@ router.patch('/:id/move', async (req, res) => {
     task.logChange('boardStatus', task.boardStatus, boardStatus, userId);
     task.boardStatus = boardStatus;
     
-    // Si se mueve a done, marcar como completada
+    // Si se mueve a done, marcar como completada y DETENER TIMERS
     if (boardStatus === 'done') {
       task.status = 'resolved';
       task.completedDate = new Date();
+      task.completionPercentage = 100;
+
+      // Detener todas las sesiones activas
+      if (task.activeSessions && task.activeSessions.length > 0) {
+        const endTime = new Date();
+        task.activeSessions.forEach(session => {
+          const durationMs = endTime.getTime() - session.startTime.getTime();
+          const durationHours = durationMs / (1000 * 60 * 60);
+          
+          task.timeLogs.push({
+            userId: session.userId,
+            startTime: session.startTime,
+            endTime,
+            durationHours,
+            notes: 'Finalizado automáticamente al completar tarea'
+          });
+          
+          task.actualHours = (task.actualHours || 0) + durationHours;
+        });
+        task.activeSessions = [];
+      }
     }
     
     await task.save();

@@ -161,7 +161,7 @@ router.post('/public', upload.array('files', 5), async (req, res) => {
 // Get all tickets (Admin/Manager/Support) with pagination
 router.get('/', authenticateToken, async (req, res) => {
   try {
-    const { status, priority, category } = req.query;
+    const { status, priority, category, assignedTo } = req.query;
     const page = parseInt(req.query.page) || 1;
     const limit = parseInt(req.query.limit) || 15;
     const skip = (page - 1) * limit;
@@ -170,6 +170,7 @@ router.get('/', authenticateToken, async (req, res) => {
     if (status) query.status = status;
     if (priority) query.priority = priority;
     if (category) query.category = category;
+    if (assignedTo) query.assignedTo = assignedTo;
 
     const total = await Ticket.countDocuments(query);
     const tickets = await Ticket.find(query)

@@ -6,6 +6,31 @@ const Client = require('../models/Client');
 const Activity = require('../models/Activity');
 const Case = require('../models/Case');
 const Team = require('../models/Team');
+const User = require('../models/User');
+
+// Helper to build activity filters based on query params
+const buildActivityMatch = async (query) => {
+  const match = {};
+  
+  if (query.clientId) {
+    match.clientId = new mongoose.Types.ObjectId(query.clientId);
+  }
+  
+  if (query.assignedTo) {
+    match.assignedTo = new mongoose.Types.ObjectId(query.assignedTo);
+  }
+  
+  if (query.department) {
+    // Find users in this department
+    const usersInDept = await User.find({ department: query.department }).select('_id');
+    const userIds = usersInDept.map(u => u._id);
+    match.assignedTo = { $in: userIds };
+  }
+  
+  return match;
+};
+
+const mongoose = require('mongoose');
 
 // Dashboard general stats
 router.get('/dashboard', async (req, res) => {
@@ -353,16 +378,26 @@ router.get('/team/performance', async (req, res) => {
     const currentDate = new Date();
     const currentMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
 
-    // Actividades por miembro del equipo
     const teamPerformance = await Activity.aggregate([
       {
         $match: {
-          createdAt: { $gte: currentMonth }
+          ...match,
+          createdAt: { $gte: currentMonth },
+          assignedTo: { $exists: true, $ne: [] }
+        }
+      },
+      {
+        $unwind: "$assignedTo"
+      },
+      {
+        // Convertir assignedTo a ObjectId si es string para asegurar el lookup
+        $addFields: {
+          assignedToObj: { $toObjectId: "$assignedTo" }
         }
       },
       {
         $group: {
-          _id: "$assignedTo", // Asumiendo que existe este campo
+          _id: "$assignedToObj",
           totalActivities: { $sum: 1 },
           completedActivities: {
             $sum: { $cond: [{ $eq: ["$status", "completed"] }, 1, 0] }
@@ -374,7 +409,7 @@ router.get('/team/performance', async (req, res) => {
       },
       {
         $lookup: {
-          from: 'teams',
+          from: 'users',
           localField: '_id',
           foreignField: '_id',
           as: 'teamMember'
@@ -386,7 +421,11 @@ router.get('/team/performance', async (req, res) => {
       {
         $addFields: {
           completionRate: {
-            $divide: ["$completedActivities", "$totalActivities"]
+            $cond: [
+              { $gt: ["$totalActivities", 0] },
+              { $multiply: [{ $divide: ["$completedActivities", "$totalActivities"] }, 100] },
+              0
+            ]
           }
         }
       },
@@ -399,18 +438,28 @@ router.get('/team/performance', async (req, res) => {
     const workload = await Activity.aggregate([
       {
         $match: {
-          status: { $in: ['pending', 'in_progress'] }
+          ...match,
+          status: { $in: ['pending', 'in-progress'] },
+          assignedTo: { $exists: true, $ne: [] }
+        }
+      },
+      {
+        $unwind: "$assignedTo"
+      },
+      {
+        $addFields: {
+          assignedToObj: { $toObjectId: "$assignedTo" }
         }
       },
       {
         $group: {
-          _id: "$assignedTo",
+          _id: "$assignedToObj",
           activeWorkload: { $sum: 1 }
         }
       },
       {
         $lookup: {
-          from: 'teams',
+          from: 'users',
           localField: '_id',
           foreignField: '_id',
           as: 'teamMember'
@@ -439,6 +488,7 @@ router.get('/team/performance', async (req, res) => {
 // Resumen ejecutivo
 router.get('/executive-summary', async (req, res) => {
   try {
+    const match = await buildActivityMatch(req.query);
     const currentDate = new Date();
     const currentMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
     const lastMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1);
@@ -447,21 +497,25 @@ router.get('/executive-summary', async (req, res) => {
     // KPIs principales
     const kpis = {
       // Clientes
-      totalClients: await Client.countDocuments(),
+      totalClients: await Client.countDocuments(match.clientId ? { _id: match.clientId } : {}),
       newClientsThisMonth: await Client.countDocuments({ 
-        createdAt: { $gte: currentMonth } 
+        createdAt: { $gte: currentMonth },
+        ...(match.clientId ? { _id: match.clientId } : {})
       }),
       newClientsLastMonth: await Client.countDocuments({ 
-        createdAt: { $gte: lastMonth, $lt: currentMonth } 
+        createdAt: { $gte: lastMonth, $lt: currentMonth },
+        ...(match.clientId ? { _id: match.clientId } : {})
       }),
 
       // Actividades
-      totalActivities: await Activity.countDocuments(),
+      totalActivities: await Activity.countDocuments(match),
       completedThisMonth: await Activity.countDocuments({
+        ...match,
         status: 'completed',
         updatedAt: { $gte: currentMonth }
       }),
       completedLastMonth: await Activity.countDocuments({
+        ...match,
         status: 'completed',
         updatedAt: { $gte: lastMonth, $lt: currentMonth }
       }),

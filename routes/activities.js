@@ -251,20 +251,37 @@ router.put('/:id', async (req, res) => {
 router.patch('/:id/status', async (req, res) => {
   try {
     const { status } = req.body;
-    const activity = await Activity.findByIdAndUpdate(
-      req.params.id,
-      { status, updatedAt: new Date() },
-      { new: true }
-    )
-      .populate('clientId', 'name email company')
-      .populate('assignedTo', 'name email role photo avatar')
-      .populate('createdBy', 'name email');
+    const activity = await Activity.findById(req.params.id);
     
     if (!activity) {
       return res.status(404).json({ error: 'Actividad no encontrada' });
     }
+
+    activity.status = status;
+    activity.updatedAt = new Date();
+
+    // Si se marca como completada, detener todas las sesiones activas
+    if (status === 'completed') {
+      activity.completionPercentage = 100;
+      
+      if (activity.activeSessions && activity.activeSessions.length > 0) {
+        const now = new Date();
+        activity.activeSessions.forEach(session => {
+          const elapsedSeconds = Math.floor((now - session.startTime) / 1000);
+          activity.timeSpent = (activity.timeSpent || 0) + elapsedSeconds;
+        });
+        activity.activeSessions = [];
+      }
+    }
+
+    await activity.save();
     
-    res.json(activity);
+    const populated = await Activity.findById(activity._id)
+      .populate('clientId', 'name email company')
+      .populate('assignedTo', 'name email role photo avatar')
+      .populate('createdBy', 'name email');
+
+    res.json(populated);
   } catch (error) {
     res.status(400).json({ error: error.message });
   }
