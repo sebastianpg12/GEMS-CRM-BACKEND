@@ -27,6 +27,20 @@ const buildActivityMatch = async (query) => {
     match.assignedTo = { $in: userIds };
   }
   
+  if (query.period) {
+    const currentDate = new Date();
+    let startDate;
+    if (query.period === 'year') {
+      startDate = new Date(currentDate.getFullYear(), 0, 1);
+    } else if (query.period === 'quarter') {
+      const quarter = Math.floor(currentDate.getMonth() / 3);
+      startDate = new Date(currentDate.getFullYear(), quarter * 3, 1);
+    } else {
+      startDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+    }
+    match.createdAt = { $gte: startDate };
+  }
+
   return match;
 };
 
@@ -168,13 +182,14 @@ router.get('/financial/:period', async (req, res) => {
 // Estadísticas de actividades
 router.get('/activities/stats', async (req, res) => {
   try {
+    const match = await buildActivityMatch(req.query);
     const currentDate = new Date();
     const currentMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
-    const lastMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1);
     const last3Months = new Date(currentDate.getFullYear(), currentDate.getMonth() - 3, 1);
 
     // Estadísticas por estado
     const statusStats = await Activity.aggregate([
+      { $match: match },
       {
         $group: {
           _id: "$status",
@@ -184,13 +199,12 @@ router.get('/activities/stats', async (req, res) => {
     ]);
 
     // Actividades completadas por mes (últimos 6 meses)
+    const completedMatch = { ...match, status: 'completed' };
+    delete completedMatch.createdAt; // Para ver la historia sin restringir la creación al periodo actual
+    completedMatch.updatedAt = { $gte: new Date(currentDate.getFullYear(), currentDate.getMonth() - 5, 1) };
+    
     const completedByMonth = await Activity.aggregate([
-      {
-        $match: {
-          status: 'completed',
-          updatedAt: { $gte: new Date(currentDate.getFullYear(), currentDate.getMonth() - 5, 1) }
-        }
-      },
+      { $match: completedMatch },
       {
         $group: {
           _id: {
@@ -200,19 +214,16 @@ router.get('/activities/stats', async (req, res) => {
           count: { $sum: 1 }
         }
       },
-      {
-        $sort: { "_id.year": 1, "_id.month": 1 }
-      }
+      { $sort: { "_id.year": 1, "_id.month": 1 } }
     ]);
 
     // Productividad del equipo (actividades completadas por cliente)
+    const productivityMatch = { ...match, status: 'completed' };
+    delete productivityMatch.createdAt;
+    productivityMatch.updatedAt = { $gte: last3Months };
+
     const productivityByClient = await Activity.aggregate([
-      {
-        $match: {
-          status: 'completed',
-          updatedAt: { $gte: last3Months }
-        }
-      },
+      { $match: productivityMatch },
       {
         $lookup: {
           from: 'clients',
@@ -221,31 +232,22 @@ router.get('/activities/stats', async (req, res) => {
           as: 'client'
         }
       },
-      {
-        $unwind: { path: "$client", preserveNullAndEmptyArrays: true }
-      },
+      { $unwind: { path: "$client", preserveNullAndEmptyArrays: true } },
       {
         $group: {
           _id: "$client.name",
           completedActivities: { $sum: 1 }
         }
       },
-      {
-        $sort: { completedActivities: -1 }
-      },
-      {
-        $limit: 10
-      }
+      { $sort: { completedActivities: -1 } },
+      { $limit: 10 }
     ]);
 
-    // Tiempo promedio de resolución (estimado basado en fecha de creación vs actualización)
+    // Tiempo promedio de resolución
+    const resolutionMatch = { ...match, status: 'completed' };
+
     const resolutionTimeStats = await Activity.aggregate([
-      {
-        $match: {
-          status: 'completed',
-          updatedAt: { $gte: currentMonth }
-        }
-      },
+      { $match: resolutionMatch },
       {
         $project: {
           resolutionDays: {
@@ -283,6 +285,7 @@ router.get('/activities/stats', async (req, res) => {
 // Estadísticas de clientes
 router.get('/clients/stats', async (req, res) => {
   try {
+    const match = await buildActivityMatch(req.query);
     const currentDate = new Date();
     const last6Months = new Date(currentDate.getFullYear(), currentDate.getMonth() - 6, 1);
 
@@ -302,13 +305,12 @@ router.get('/clients/stats', async (req, res) => {
           newClients: { $sum: 1 }
         }
       },
-      {
-        $sort: { "_id.year": 1, "_id.month": 1 }
-      }
+      { $sort: { "_id.year": 1, "_id.month": 1 } }
     ]);
 
-    // Clientes más activos (con más actividades)
+    // Clientes más activos (con más actividades filtradas)
     const topActiveClients = await Activity.aggregate([
+      { $match: match },
       {
         $lookup: {
           from: 'clients',
@@ -317,9 +319,7 @@ router.get('/clients/stats', async (req, res) => {
           as: 'client'
         }
       },
-      {
-        $unwind: { path: "$client", preserveNullAndEmptyArrays: true }
-      },
+      { $unwind: { path: "$client", preserveNullAndEmptyArrays: false } },
       {
         $group: {
           _id: "$client._id",
@@ -334,29 +334,16 @@ router.get('/clients/stats', async (req, res) => {
       {
         $addFields: {
           completionRate: {
-            $divide: ["$completedActivities", "$totalActivities"]
+            $cond: [
+              { $gt: ["$totalActivities", 0] },
+              { $divide: ["$completedActivities", "$totalActivities"] },
+              0
+            ]
           }
         }
       },
-      {
-        $sort: { totalActivities: -1 }
-      },
-      {
-        $limit: 10
-      }
-    ]);
-
-    // Distribución geográfica (si hay campo de ubicación)
-    const clientsByLocation = await Client.aggregate([
-      {
-        $group: {
-          _id: "$ubicacion",
-          count: { $sum: 1 }
-        }
-      },
-      {
-        $sort: { count: -1 }
-      }
+      { $sort: { totalActivities: -1 } },
+      { $limit: 10 }
     ]);
 
     res.json({
@@ -364,7 +351,7 @@ router.get('/clients/stats', async (req, res) => {
       data: {
         growth: clientGrowth,
         topActive: topActiveClients,
-        locationDistribution: clientsByLocation
+        locationDistribution: []
       }
     });
   } catch (error) {
@@ -375,14 +362,12 @@ router.get('/clients/stats', async (req, res) => {
 // Estadísticas del equipo
 router.get('/team/performance', async (req, res) => {
   try {
-    const currentDate = new Date();
-    const currentMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
+    const match = await buildActivityMatch(req.query);
 
     const teamPerformance = await Activity.aggregate([
       {
         $match: {
           ...match,
-          createdAt: { $gte: currentMonth },
           assignedTo: { $exists: true, $ne: [] }
         }
       },
