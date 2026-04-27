@@ -83,6 +83,7 @@ const boardsRoutes = require('./routes/boards');
 const githubRoutes = require('./routes/github');
 const ticketsRoutes = require('./routes/tickets');
 const rolesRoutes = require('./routes/roles');
+const wikiRoutes = require('./routes/wiki');
 
 // Usar rutas
 app.use('/api/auth', authRoutes);
@@ -109,6 +110,7 @@ app.use('/api/boards', boardsRoutes);
 app.use('/api/github', githubRoutes);
 app.use('/api/tickets', ticketsRoutes);
 app.use('/api/roles', rolesRoutes);
+app.use('/api/wiki', wikiRoutes);
 
 
 // Conexión a MongoDB usando .env

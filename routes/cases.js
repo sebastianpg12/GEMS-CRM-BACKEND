@@ -135,6 +135,8 @@ router.post('/', upload.array('archivos', 10), async (req, res) => {
       estado: req.body.estado || 'abierto',
       prioridad: req.body.prioridad || 'media',
       progreso: req.body.progreso ? parseInt(req.body.progreso) : 0,
+      cliente_id: req.body.cliente_id || null,
+      categoria: req.body.categoria || '',
       archivos: []
     };
 
@@ -305,9 +307,12 @@ router.post('/:id/comments', async (req, res) => {
     await case_item.save();
     
     const updatedCase = await Case.findById(req.params.id)
-      .populate('comentarios.autor', 'name email avatar');
+      .populate('cliente_id', 'nombre empresa email')
+      .populate('asignado_a', 'name email role avatar')
+      .populate('comentarios.autor', 'name email avatar')
+      .populate('dailyLogs.autor', 'name email avatar');
     
-    res.json(updatedCase.comentarios[updatedCase.comentarios.length - 1]);
+    res.json(updatedCase);
   } catch (error) {
     console.error('Error adding comment:', error);
     res.status(400).json({ error: 'Error al agregar el comentario' });
@@ -482,9 +487,12 @@ router.post('/:id/daily-logs', async (req, res) => {
     await case_item.save();
     
     const updatedCase = await Case.findById(req.params.id)
+      .populate('cliente_id', 'nombre empresa email')
+      .populate('asignado_a', 'name email role avatar')
+      .populate('comentarios.autor', 'name email avatar')
       .populate('dailyLogs.autor', 'name email avatar');
     
-    res.json(updatedCase.dailyLogs[0]);
+    res.json(updatedCase);
   } catch (error) {
     console.error('Error adding daily log:', error);
     res.status(400).json({ error: 'Error al agregar el seguimiento diario' });
