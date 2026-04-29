@@ -68,7 +68,8 @@ router.post('/', upload.array('archivos', 5), async (req, res) => {
     const newArticle = await article.save();
     res.status(201).json(newArticle);
   } catch (err) {
-    res.status(400).json({ message: err.message });
+    console.error('Error en POST /api/wiki:', err);
+    res.status(500).json({ message: err.message, stack: err.stack });
   }
 });
 
@@ -91,7 +92,8 @@ router.put('/:id', upload.array('archivos', 5), async (req, res) => {
     const updatedArticle = await Wiki.findByIdAndUpdate(req.params.id, updateData, { new: true });
     res.json(updatedArticle);
   } catch (err) {
-    res.status(400).json({ message: err.message });
+    console.error('Error en PUT /api/wiki:', err);
+    res.status(500).json({ message: err.message });
   }
 });
 
