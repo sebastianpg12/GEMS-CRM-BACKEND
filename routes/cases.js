@@ -249,11 +249,21 @@ router.put('/:id', upload.array('archivos', 10), async (req, res) => {
       tipo: req.body.tipo || case_item.tipo,
       estado: req.body.estado || case_item.estado,
       prioridad: req.body.prioridad || case_item.prioridad,
-      progreso: req.body.progreso ? parseInt(req.body.progreso) : case_item.progreso,
+      progreso: req.body.progreso !== undefined ? parseInt(req.body.progreso) : case_item.progreso,
       metodologia: req.body.metodologia || case_item.metodologia,
       wikiContent: req.body.wikiContent || case_item.wikiContent,
+      cliente_id: req.body.cliente_id || case_item.cliente_id,
+      asignado_a: req.body.asignado_a || case_item.asignado_a,
+      categoria: req.body.categoria || case_item.categoria,
+      gravedad: req.body.gravedad || case_item.gravedad,
+      impacto: req.body.impacto || case_item.impacto,
       updatedAt: new Date()
     };
+
+    // Manejar tags si vienen como string o array
+    if (req.body.tags) {
+      updateData.tags = Array.isArray(req.body.tags) ? req.body.tags : req.body.tags.split(',').map(t => t.trim());
+    }
 
     // Si hay nuevos archivos, agregarlos a los existentes
     if (req.files && req.files.length > 0) {
