@@ -10,7 +10,7 @@ if (!JWT_SECRET || JWT_SECRET.length < 32) {
   process.exit(1);
 }
 
-const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '8h'; // Sesión de una jornada de trabajo
+const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN || '30d'; // El frontend no usa refresh token, así que la sesión debe durar por sí sola
 // Token "pre-auth": emitido tras validar credenciales, antes de elegir org.
 const PRE_AUTH_EXPIRES_IN = '10m';
 
