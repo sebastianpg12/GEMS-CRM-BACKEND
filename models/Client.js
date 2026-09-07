@@ -49,6 +49,27 @@ const CustomFieldSchema = new mongoose.Schema(
   { _id: true }
 );
 
+const ProjectExternalLinkSchema = new mongoose.Schema(
+  {
+    nombre: String,
+    url: String,
+    agregadoPor: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    fecha: { type: Date, default: Date.now }
+  },
+  { _id: true }
+);
+
+const ProjectFileSchema = new mongoose.Schema(
+  {
+    nombre: String,
+    url: String,
+    tipo: String,
+    tamaño: Number,
+    fecha_subida: { type: Date, default: Date.now }
+  },
+  { _id: true }
+);
+
 const ProjectSchema = new mongoose.Schema(
   {
     name: { type: String, required: true, trim: true },
@@ -58,7 +79,9 @@ const ProjectSchema = new mongoose.Schema(
     startDate: Date,
     endDate: Date,
     // Marca el proyecto contenedor por defecto; no se puede eliminar desde la UI.
-    isDefault: { type: Boolean, default: false }
+    isDefault: { type: Boolean, default: false },
+    enlacesExternos: [ProjectExternalLinkSchema],
+    archivos: [ProjectFileSchema]
   },
   { timestamps: true }
 );

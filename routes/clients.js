@@ -1,6 +1,25 @@
 const express = require('express');
 const router = express.Router();
+const multer = require('multer');
+const path = require('path');
+const fs = require('fs');
 const Client = require('../models/Client');
+
+// Mismo patrón de subida que cases.js/wiki.js — carpeta uploads compartida.
+const projectFileStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const uploadPath = path.join(__dirname, '..', 'uploads');
+    if (!fs.existsSync(uploadPath)) fs.mkdirSync(uploadPath, { recursive: true });
+    cb(null, uploadPath);
+  },
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
+    const extension = path.extname(file.originalname);
+    const basename = path.basename(file.originalname, extension);
+    cb(null, basename + '-' + uniqueSuffix + extension);
+  }
+});
+const uploadProjectFiles = multer({ storage: projectFileStorage, limits: { fileSize: 10 * 1024 * 1024 } });
 
 // Helper: filtro base de tenant + (opcional) _id
 const tFilter = (req, extra = {}) => ({ organizationId: req.organizationId, ...extra });
@@ -190,6 +209,57 @@ router.delete('/:id/projects/:projectId', async (req, res) => {
   project.deleteOne();
   await client.save();
   res.json({ success: true, archived: false });
+});
+
+// Enlaces externos del proyecto (Google Drive, OneDrive, etc.)
+router.post('/:id/projects/:projectId/links', async (req, res) => {
+  const client = await loadOwnedClient(req, res); if (!client) return;
+  const project = client.projects.id(req.params.projectId);
+  if (!project) return res.status(404).json({ message: 'Project not found' });
+  const { nombre, url } = req.body || {};
+  if (!nombre || !url) return res.status(400).json({ message: 'nombre y url son requeridos' });
+  project.enlacesExternos.push({ nombre, url, agregadoPor: req.user?._id });
+  await client.save();
+  res.status(201).json(project.enlacesExternos[project.enlacesExternos.length - 1]);
+});
+
+router.delete('/:id/projects/:projectId/links/:linkId', async (req, res) => {
+  const client = await loadOwnedClient(req, res); if (!client) return;
+  const project = client.projects.id(req.params.projectId);
+  if (!project) return res.status(404).json({ message: 'Project not found' });
+  const link = project.enlacesExternos.id(req.params.linkId);
+  if (!link) return res.status(404).json({ message: 'Link not found' });
+  link.deleteOne();
+  await client.save();
+  res.json({ success: true });
+});
+
+// Adjuntos del proyecto
+router.post('/:id/projects/:projectId/files', uploadProjectFiles.array('archivos', 10), async (req, res) => {
+  const client = await loadOwnedClient(req, res); if (!client) return;
+  const project = client.projects.id(req.params.projectId);
+  if (!project) return res.status(404).json({ message: 'Project not found' });
+  const nuevos = (req.files || []).map(file => ({
+    nombre: file.originalname,
+    url: `/uploads/${file.filename}`,
+    tipo: file.mimetype,
+    tamaño: file.size,
+    fecha_subida: new Date()
+  }));
+  project.archivos.push(...nuevos);
+  await client.save();
+  res.status(201).json(project.archivos);
+});
+
+router.delete('/:id/projects/:projectId/files/:fileId', async (req, res) => {
+  const client = await loadOwnedClient(req, res); if (!client) return;
+  const project = client.projects.id(req.params.projectId);
+  if (!project) return res.status(404).json({ message: 'Project not found' });
+  const file = project.archivos.id(req.params.fileId);
+  if (!file) return res.status(404).json({ message: 'File not found' });
+  file.deleteOne();
+  await client.save();
+  res.json({ success: true });
 });
 
 // Commitments
