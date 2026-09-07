@@ -18,11 +18,17 @@ router.get('/:id', async (req, res) => {
   res.json(client);
 });
 
+// Proyectos con los que arranca todo cliente nuevo, para no tener que crearlos a mano.
+const DEFAULT_PROJECTS = ['Soporte', 'Interno', 'Implementación'];
+
 router.post('/', async (req, res) => {
   const data = { ...req.body };
   if (data.nombre) data.name = data.nombre;
   if (data.telefono) data.phone = data.telefono;
   data.organizationId = req.organizationId;
+  if (!data.projects || data.projects.length === 0) {
+    data.projects = DEFAULT_PROJECTS.map(name => ({ name, status: 'active' }));
+  }
   const client = new Client(data);
   await client.save();
   res.json(client);
