@@ -90,9 +90,18 @@ const ClientSchema = new mongoose.Schema(
   {
     organizationId: { type: mongoose.Schema.Types.ObjectId, ref: 'Organization', required: true, index: true },
     name: { type: String, required: true },
-    email: String,
+    email: {
+      type: String,
+      validate: {
+        validator: (v) => !v || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v),
+        message: 'El correo electrónico no tiene un formato válido'
+      }
+    },
     phone: String,
     company: String,
+    nit: String,
+    // Clientes con historial no se borran físicamente — se inactivan (ver DELETE /:id).
+    status: { type: String, enum: ['active', 'inactive'], default: 'active' },
     tags: [String],
     profile: {
       about: String,

@@ -40,33 +40,72 @@ router.get('/:id', async (req, res) => {
 // Proyectos con los que arranca todo cliente nuevo, para no tener que crearlos a mano.
 const DEFAULT_PROJECTS = ['Soporte', 'Interno', 'Implementación'];
 
-router.post('/', async (req, res) => {
-  const data = { ...req.body };
-  if (data.nombre) data.name = data.nombre;
-  if (data.telefono) data.phone = data.telefono;
-  data.organizationId = req.organizationId;
-  if (!data.projects || data.projects.length === 0) {
-    data.projects = DEFAULT_PROJECTS.map(name => ({ name, status: 'active' }));
+router.post('/', async (req, res, next) => {
+  try {
+    const data = { ...req.body };
+    if (data.nombre) data.name = data.nombre;
+    if (data.telefono) data.phone = data.telefono;
+    data.organizationId = req.organizationId;
+    if (!data.projects || data.projects.length === 0) {
+      data.projects = DEFAULT_PROJECTS.map(name => ({ name, status: 'active' }));
+    }
+    const client = new Client(data);
+    await client.save();
+    res.json(client);
+  } catch (err) {
+    if (err.name === 'ValidationError') return res.status(400).json({ message: err.message });
+    next(err);
   }
-  const client = new Client(data);
-  await client.save();
-  res.json(client);
 });
 
-router.put('/:id', async (req, res) => {
-  const data = { ...req.body };
-  if (data.nombre) data.name = data.nombre;
-  if (data.telefono) data.phone = data.telefono;
-  delete data.organizationId; // nunca permitir reasignar org
-  const client = await Client.findOneAndUpdate(tFilterById(req), data, { new: true });
-  if (!client) return res.status(404).json({ message: 'Client not found' });
-  res.json(client);
+router.put('/:id', async (req, res, next) => {
+  try {
+    const data = { ...req.body };
+    if (data.nombre) data.name = data.nombre;
+    if (data.telefono) data.phone = data.telefono;
+    delete data.organizationId; // nunca permitir reasignar org
+    const client = await Client.findOneAndUpdate(tFilterById(req), data, { new: true, runValidators: true });
+    if (!client) return res.status(404).json({ message: 'Client not found' });
+    res.json(client);
+  } catch (err) {
+    if (err.name === 'ValidationError') return res.status(400).json({ message: err.message });
+    next(err);
+  }
 });
 
 router.delete('/:id', async (req, res) => {
-  const result = await Client.findOneAndDelete(tFilterById(req));
-  if (!result) return res.status(404).json({ message: 'Client not found' });
+  const client = await Client.findOne(tFilterById(req));
+  if (!client) return res.status(404).json({ message: 'Client not found' });
+
+  // No se borra un cliente con historial — se bloquea y se ofrece inactivar en su lugar.
+  const Case = require('../models/Case');
+  const Task = require('../models/Task');
+  const Activity = require('../models/Activity');
+  const Ticket = require('../models/Ticket');
+  const [cases, tasks, activities, tickets] = await Promise.all([
+    Case.countDocuments({ organizationId: req.organizationId, cliente_id: client._id }),
+    Task.countDocuments({ organizationId: req.organizationId, clientId: client._id }),
+    Activity.countDocuments({ organizationId: req.organizationId, clientId: client._id }),
+    Ticket.countDocuments({ organizationId: req.organizationId, clientId: client._id })
+  ]);
+  const total = cases + tasks + activities + tickets;
+  if (total > 0) {
+    return res.status(409).json({
+      message: `Este cliente tiene ${total} registro(s) asociado(s) (casos, tareas, actividades o tickets) y no se puede eliminar. Gestiona esos registros primero, o inactiva el cliente en su lugar.`,
+      counts: { cases, tasks, activities, tickets }
+    });
+  }
+
+  await client.deleteOne();
   res.json({ success: true });
+});
+
+// Inactivar/activar en vez de borrar — conserva la trazabilidad histórica del cliente.
+router.patch('/:id/status', async (req, res) => {
+  const status = req.body?.status === 'active' ? 'active' : 'inactive';
+  const client = await Client.findOneAndUpdate(tFilterById(req), { status }, { new: true });
+  if (!client) return res.status(404).json({ message: 'Client not found' });
+  res.json(client);
 });
 
 // ── Detail (wiki) endpoints ──
@@ -76,12 +115,17 @@ router.get('/:id/detail', async (req, res) => {
   res.json(client);
 });
 
-router.patch('/:id/detail', async (req, res) => {
-  const updates = { ...(req.body || {}) };
-  delete updates.organizationId;
-  const client = await Client.findOneAndUpdate(tFilterById(req), { $set: updates }, { new: true });
-  if (!client) return res.status(404).json({ message: 'Client not found' });
-  res.json(client);
+router.patch('/:id/detail', async (req, res, next) => {
+  try {
+    const updates = { ...(req.body || {}) };
+    delete updates.organizationId;
+    const client = await Client.findOneAndUpdate(tFilterById(req), { $set: updates }, { new: true, runValidators: true });
+    if (!client) return res.status(404).json({ message: 'Client not found' });
+    res.json(client);
+  } catch (err) {
+    if (err.name === 'ValidationError') return res.status(400).json({ message: err.message });
+    next(err);
+  }
 });
 
 // ── Helper para sub-recursos: carga el cliente scoped por tenant ──
